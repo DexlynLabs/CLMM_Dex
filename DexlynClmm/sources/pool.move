@@ -152,7 +152,7 @@ module dexlyn_clmm::pool {
     const EPOOL_ADDRESS_ERROR: u64 = 31;
 
     /// The pool is paused
-    const EPOOL_IS_PAUDED: u64 = 32;
+    const EPOOL_IS_PAUSED: u64 = 32;
 
     /// The pool liquidity is not zero, can not reset the init price
     const EPOOL_LIQUIDITY_IS_NOT_ZERO: u64 = 33;
@@ -1454,6 +1454,7 @@ module dexlyn_clmm::pool {
         pool_address: address,
         position_index: u64
     ) acquires Pool {
+        check_pool_exists(pool_address);
         let pool = borrow_global<Pool>(pool_address);
         if (!table::contains(&pool.positions, position_index)) {
             abort EPOSITION_NOT_EXIST
@@ -1477,6 +1478,7 @@ module dexlyn_clmm::pool {
     public fun fetch_ticks(
         pool_address: address, index: u64, offset: u64, limit: u64
     ): (u64, u64, vector<Tick>) acquires Pool {
+        check_pool_exists(pool_address);
         let pool = borrow_global_mut<Pool>(pool_address);
         let tick_spacing = pool.tick_spacing;
         let max_indexes_index = tick_indexes_max(tick_spacing);
@@ -1512,6 +1514,7 @@ module dexlyn_clmm::pool {
     public fun fetch_positions(
         pool_address: address, index: u64, limit: u64
     ): (u64, vector<Position>) acquires Pool {
+        check_pool_exists(pool_address);
         let pool_info = borrow_global<Pool>(pool_address);
         let positions = vector::empty<Position>();
         let count = 0;
@@ -1542,6 +1545,7 @@ module dexlyn_clmm::pool {
         by_amount_in: bool,
         amount: u64,
     ): CalculatedSwapResult acquires Pool {
+        check_pool_exists(pool_address);
         let pool = borrow_global<Pool>(pool_address);
         let current_sqrt_price = pool.current_sqrt_price;
         let current_liquidity = pool.liquidity;
@@ -1662,24 +1666,21 @@ module dexlyn_clmm::pool {
 
     #[view]
     public fun get_tick_spacing(pool: address): u64 acquires Pool {
-        if (!exists<Pool>(pool)) {
-            abort EPOOL_NOT_EXISTS
-        };
+        check_pool_exists(pool);
         let pool_info = borrow_global<Pool>(pool);
         pool_info.tick_spacing
     }
 
     #[view]
     public fun get_pool_liquidity(pool: address): u128 acquires Pool {
-        if (!exists<Pool>(pool)) {
-            abort EPOOL_NOT_EXISTS
-        };
+        check_pool_exists(pool);
         let pool_info = borrow_global<Pool>(pool);
         pool_info.liquidity
     }
 
     #[view]
     public fun get_pool_index(pool: address): u64 acquires Pool {
+        check_pool_exists(pool);
         let pool_info = borrow_global<Pool>(pool);
         pool_info.index
     }
@@ -1689,6 +1690,7 @@ module dexlyn_clmm::pool {
         pool_address: address,
         pos_indices: vector<u64>
     ): vector<Position> acquires Pool {
+        check_pool_exists(pool_address);
         let pool_info = borrow_global<Pool>(pool_address);
         let positions = vector::empty<Position>();
         vector::for_each(pos_indices, |pos_index| {
@@ -1716,6 +1718,7 @@ module dexlyn_clmm::pool {
         pool_address: address,
         position_index: u64
     ): (I64, I64) acquires Pool {
+        check_pool_exists(pool_address);
         let pool_info = borrow_global<Pool>(pool_address);
         if (!table::contains(&pool_info.positions, position_index)) {
             abort EPOSITION_NOT_EXIST
@@ -1726,6 +1729,7 @@ module dexlyn_clmm::pool {
 
     #[view]
     public fun get_rewarder_len(pool_address: address): u8 acquires Pool {
+        check_pool_exists(pool_address);
         let pool_info = borrow_global<Pool>(pool_address);
         let len = vector::length(&pool_info.rewarder_infos);
         return (len as u8)
@@ -1737,6 +1741,7 @@ module dexlyn_clmm::pool {
         pool_address: address,
         position_indices: vector<u64>,
     ): vector<PositionReward> acquires Pool {
+        check_pool_exists(pool_address);
         let pool = borrow_global_mut<Pool>(pool_address);
         let results = vector::empty<PositionReward>();
 
@@ -1775,8 +1780,13 @@ module dexlyn_clmm::pool {
 
     #[view]
     public fun get_pool_assets(pool_address: address): (address, address) acquires Pool {
+        check_pool_exists(pool_address);
         let pool_info = borrow_global<Pool>(pool_address);
         return (pool_info.asset_a_addr, pool_info.asset_b_addr)
+    }
+
+    fun check_pool_exists(pool_address: address) {
+        assert!(exists<Pool>(pool_address), EPOOL_NOT_EXISTS);
     }
 
     #[view]
@@ -1795,6 +1805,7 @@ module dexlyn_clmm::pool {
     /// Generate the token addresses for the positions.
     public fun generate_token_addresses(pool_address: address, position_ids: vector<u64>): vector<address> acquires Pool
     {
+        check_pool_exists(pool_address);
         let pool = borrow_global<Pool>(pool_address);
         let token_addresses = vector::empty<address>();
 
@@ -1838,7 +1849,8 @@ module dexlyn_clmm::pool {
 
         vector::for_each(pool_addresses, |pool_address| {
             let result = calculate_swap_result(pool_address, a2b, by_amount_in, amount);
-            if (result.amount_out > best_amount_out && result.is_exceed == false) {
+            if (result.amount_out > best_amount_out) {
+                best_amount_out = result.amount_out;
                 best_pool_address = pool_address;
                 best_swap_result = result;
             };
@@ -1851,7 +1863,7 @@ module dexlyn_clmm::pool {
     fun assert_status(pool: &Pool) {
         config::assert_protocol_status();
         if (pool.is_pause) {
-            abort EPOOL_IS_PAUDED
+            abort EPOOL_IS_PAUSED
         };
     }
 

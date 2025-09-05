@@ -29,11 +29,16 @@ module dexlyn_clmm::pool_test {
         let tick_spacing = 200;
         let init_sqrt_price = 18446744073709551616;
 
+        let asset_a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let asset_b_addr = utils::coin_to_fa_address<TestCoinA>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(asset_a_addr, asset_b_addr);
         clmm_router::create_pool_coin_coin<TestCoinA, TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
-            string::utf8(b"")
+            string::utf8(b""),
+            asset_a_sorted,
+            asset_b_sorted
         );
     }
 
@@ -53,11 +58,17 @@ module dexlyn_clmm::pool_test {
         let tick_spacing = 200;
         let init_sqrt_price = 100;
 
-        clmm_router::create_pool_coin_coin<TestCoinA, TestCoinB>(
+        let asset_a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let asset_b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(asset_a_addr, asset_b_addr);
+
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
-            string::utf8(b"")
+            string::utf8(b""),
+            asset_a_sorted,
+            asset_b_sorted
         );
     }
 
@@ -75,9 +86,10 @@ module dexlyn_clmm::pool_test {
 
         let asset_a_addr = utils::coin_to_fa_address<TestCoinA>();
         let asset_b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(asset_a_addr, asset_b_addr);
 
 
-        let pool_opt = factory::get_pool(200, asset_a_addr, asset_b_addr);
+        let pool_opt = factory::get_pool(200, asset_a_sorted, asset_b_sorted);
         assert!(option::is_none(&pool_opt), 1);
     }
 
@@ -99,13 +111,15 @@ module dexlyn_clmm::pool_test {
 
         add_fee_tier(admin, tick_spacing, fee_rate);
 
-        clmm_router::create_pool_coin_coin<TestCoinA, TestCoinB>(
-            admin, tick_spacing, init_sqrt_price, string::utf8(b"")
-        );
-
         let a_addr = utils::coin_to_fa_address<TestCoinA>();
         let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let pool_address = get_pool_address(tick_spacing, a_addr, b_addr);
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), asset_a_sorted, asset_b_sorted
+        );
+
+        let pool_address = get_pool_address(tick_spacing, asset_a_sorted, asset_b_sorted);
 
         // Open a position
         let tick_lower = 18446744073709551216; // -400
@@ -138,14 +152,16 @@ module dexlyn_clmm::pool_test {
         let tick_spacing = 100;
         let init_sqrt_price = 18446744073709551616;
 
-        add_fee_tier(admin, tick_spacing, fee_rate);
-        clmm_router::create_pool_coin_coin<TestCoinA, TestCoinB>(
-            admin, tick_spacing, init_sqrt_price, string::utf8(b"")
-        );
-
         let a_addr = utils::coin_to_fa_address<TestCoinA>();
         let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let pool_address = get_pool_address(tick_spacing, a_addr, b_addr);
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+        add_fee_tier(admin, tick_spacing, fee_rate);
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), asset_a_sorted, asset_b_sorted
+        );
+
+        let pool_address = get_pool_address(tick_spacing, b_addr, a_addr);
 
         // fetch_ticks
         let (_tick_index, _bit_index, ticks) = pool::fetch_ticks(pool_address, 0, 0, 10);
@@ -176,14 +192,16 @@ module dexlyn_clmm::pool_test {
         let init_sqrt_price = 18446744073709551616;
         add_fee_tier(admin, tick_spacing, fee_rate);
 
-        clmm_router::create_pool_coin_coin<TestCoinA, TestCoinB>(
-            admin, tick_spacing, init_sqrt_price, string::utf8(b"")
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), asset_a_sorted, asset_b_sorted
         );
 
 
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let pool_address = get_pool_address(tick_spacing, a_addr, b_addr);
+        let pool_address = get_pool_address(tick_spacing, b_addr, a_addr);
 
         // get_rewarder_len
         let rewarder_len = pool::get_rewarder_len(pool_address);
@@ -212,13 +230,16 @@ module dexlyn_clmm::pool_test {
         let init_sqrt_price = 18446744073709551616;
         let fee_rate = 1000;
         add_fee_tier(admin, tick_spacing, fee_rate);
-        clmm_router::create_pool_coin_coin<TestCoinA, TestCoinB>(
-            admin, tick_spacing, init_sqrt_price, string::utf8(b"")
-        );
 
         let a_addr = utils::coin_to_fa_address<TestCoinA>();
         let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let pool_address = get_pool_address(tick_spacing, a_addr, b_addr);
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), asset_a_sorted, asset_b_sorted
+        );
+
+        let pool_address = get_pool_address(tick_spacing, asset_a_sorted, asset_b_sorted);
 
         // reset_init_price_v2
         pool::reset_init_price_v2(admin, pool_address, init_sqrt_price);
@@ -229,7 +250,8 @@ module dexlyn_clmm::pool_test {
 
     #[test_only]
     public fun get_pool_address(tick_spacing: u64, a_addr: address, b_addr: address): address {
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, b_addr);
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         option::extract(&mut clmm_pool_addr_opt)
     }
 }

@@ -816,8 +816,8 @@ module dexlyn_clmm::add_liquidity_test {
 
         let tick_spacing = 200;
         let init_sqrt_price = 18446744073709551616;
-        let amount_a = 100000;
-        let amount_b = 400000;
+        let amount_a = 400000;
+        let amount_b = 100000;
         let tick_lower = 18446744073709551216; // -400
         let tick_upper = 16000;
         let fee_rate = 1000;
@@ -830,16 +830,21 @@ module dexlyn_clmm::add_liquidity_test {
         let user_balance_a_before = coin::balance<TestCoinA>(signer::address_of(admin));
         let user_balance_b_before = coin::balance<TestCoinB>(signer::address_of(admin));
 
-        create_pool_coin_coin<TestCoinA, TestCoinB>(
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+
+        create_pool_coin_coin<TestCoinB, TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
             string::utf8(b""),
+            asset_a_sorted,
+            asset_b_sorted
         );
 
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, b_addr);
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         let pool_address = option::extract(&mut clmm_pool_addr_opt);
 
         migrate_to_fungible_store<TestCoinB>(admin);
@@ -856,13 +861,13 @@ module dexlyn_clmm::add_liquidity_test {
         );
 
         let pool_liquidity = get_pool_liquidity(pool_address);
-        assert!(pool_liquidity == 181602, 1002); // min[181602.549077, 20201666.612228]
+        assert!(pool_liquidity == 726410, 1002); // min[726410.196307, 5050416.653057]
 
         let user_balance_a_after = coin::balance<TestCoinA>(signer::address_of(admin));
         let user_balance_b_after = coin::balance<TestCoinB>(signer::address_of(admin));
 
-        assert!((user_balance_a_before - user_balance_a_after) == 100000, 1003); // 99999.6976491452
-        assert!((user_balance_b_before - user_balance_b_after) == 3596, 1004); // 3595.782535883948
+        assert!((user_balance_a_before - user_balance_a_after) == 14384, 1003); // 99999.6976491452
+        assert!((user_balance_b_before - user_balance_b_after) == 400000, 1004); // 3595.782535883948
     }
 
     #[test(
@@ -882,8 +887,8 @@ module dexlyn_clmm::add_liquidity_test {
 
         let tick_spacing = 200;
         let init_sqrt_price = 18446744073709551616;
-        let amount_a = 100000;
-        let amount_b = 400000;
+        let amount_a = 400000;
+        let amount_b = 100000;
         let tick_lower = 18446744073709551216; // -400
         let tick_upper = 16000;
         let fee_rate = 1000;
@@ -895,16 +900,18 @@ module dexlyn_clmm::add_liquidity_test {
 
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, token_b);
         create_pool_coin_asset<TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
             string::utf8(b""),
-            token_b
+            asset_a_sorted,
+            asset_b_sorted
         );
 
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, token_b);
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         let pool_address = option::extract(&mut clmm_pool_addr_opt);
 
         add_liquidity_fix_value_coin_asset<TestCoinA>(
@@ -920,11 +927,11 @@ module dexlyn_clmm::add_liquidity_test {
         );
 
         let pool_liquidity = get_pool_liquidity(pool_address);
-        assert!(pool_liquidity == 181602, 1002); // min[181602.549077, 20201666.612228]
+        assert!(pool_liquidity == 726410, 1002); // min[726410.196307, 5050416.653057]
 
         let user_balance_b_after = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
-        assert!((user_balance_b_before - user_balance_b_after) == 3596, 1004); // 3595.782535883948
+        assert!((user_balance_b_before - user_balance_b_after) == 400000, 1004); // 400000.0
     }
 
     #[test(
@@ -951,16 +958,21 @@ module dexlyn_clmm::add_liquidity_test {
         add_fee_tier(admin, tick_spacing, fee_rate);
         assert!(fee_rate == get_fee_rate(tick_spacing), 1001);
 
-        create_pool_coin_coin<TestCoinA, TestCoinB>(
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
+        create_pool_coin_coin<TestCoinB, TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
             string::utf8(b""),
+            asset_a_sorted,
+            asset_b_sorted
         );
 
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, b_addr);
+
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         let pool_address = option::extract(&mut clmm_pool_addr_opt);
 
         add_liquidity_coin_coin<TestCoinA, TestCoinB>(
@@ -996,8 +1008,8 @@ module dexlyn_clmm::add_liquidity_test {
 
         let tick_spacing = 200;
         let init_sqrt_price = 18446744073709551616;
-        let amount_a = 100000;
-        let amount_b = 400000;
+        let amount_a = 400000;
+        let amount_b = 100000;
         let tick_lower = 18446744073709551216; // -400
         let tick_upper = 16000;
         let fee_rate = 1000;
@@ -1009,22 +1021,26 @@ module dexlyn_clmm::add_liquidity_test {
 
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, token_b);
+
         create_pool_coin_asset<TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
             string::utf8(b""),
-            token_b
+            asset_a_sorted,
+            asset_b_sorted
         );
 
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, token_b);
+
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         let pool_address = option::extract(&mut clmm_pool_addr_opt);
 
         add_liquidity_coin_asset<TestCoinA>(
             admin,
             pool_address,
-            181602,
+            726410,
             amount_a,
             amount_b,
             tick_lower,
@@ -1034,11 +1050,11 @@ module dexlyn_clmm::add_liquidity_test {
         );
 
         let pool_liquidity = get_pool_liquidity(pool_address);
-        assert!(pool_liquidity == 181602, 1002);
+        assert!(pool_liquidity == 726410, 1002);
 
         let user_balance_b_after = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
-        assert!((user_balance_b_before - user_balance_b_after) == 3596, 1004); // 3595.782535883948
+        assert!((user_balance_b_before - user_balance_b_after) == 400000, 1004); // 400000.0
     }
 
     #[test(
@@ -1160,7 +1176,7 @@ module dexlyn_clmm::add_liquidity_test {
 
 
         let pool_addresses = vector[pool_address1, pool_address2, pool_address3];
-        let (best_pool, best_amount) = pool::swap_routing(pool_addresses, true, true, 100000);
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, true, 100000);
 
         assert!(best_pool == pool_address3, 9001);
     }

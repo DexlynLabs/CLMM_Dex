@@ -46,4 +46,19 @@ module dexlyn_clmm::utils {
         fungible_asset::destroy_zero(fungible_asset);
         object::object_address(&asset_metadata)
     }
+
+    #[test_only]
+    /// Sort tokens by address to ensure consistent ordering
+    public fun sort_tokens(
+        token_x: address,
+        token_y: address,
+    ): (address, address) {
+        let cmp = comparator::compare(&token_x, &token_y);
+
+        if (comparator::is_smaller_than(&cmp)) {
+            (token_x, token_y)
+        } else {
+            (token_y, token_x)
+        }
+    }
 }

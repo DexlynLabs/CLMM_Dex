@@ -42,6 +42,12 @@ module dexlyn_clmm::clmm_router {
     /// the position is not zero, can not close it.
     const EPOSITION_IS_NOT_ZERO: u64 = 9;
 
+    /// The asset addresses are out of sequence from CoinType
+    const ESEQUENTIAL_MISMTACH: u64 = 10;
+
+    ///One of the asset address is not matching with the CoinType converted FA address
+    const ENOT_COIN_ASSET_ADDR: u64 = 11;
+
     /// Transfer the `protocol_authority` to new authority.
     /// Params
     ///     - next_protocol_authority
@@ -171,14 +177,20 @@ module dexlyn_clmm::clmm_router {
         tick_spacing: u64,
         initialize_sqrt_price: u128,
         uri: String,
+        asset_a_addr: address,
+        asset_b_addr: address
     ) {
+        let a_addr = utils::coin_to_fa_address<CoinTypeA>();
+        let b_addr = utils::coin_to_fa_address<CoinTypeB>();
+        assert!(asset_a_addr == a_addr && asset_b_addr == b_addr, ESEQUENTIAL_MISMTACH);
+
         factory::create_pool(
             account,
             tick_spacing,
             initialize_sqrt_price,
             uri,
-            utils::coin_to_fa_address<CoinTypeA>(),
-            utils::coin_to_fa_address<CoinTypeB>()
+            asset_a_addr,
+            asset_b_addr
         );
     }
 
@@ -196,14 +208,18 @@ module dexlyn_clmm::clmm_router {
         tick_spacing: u64,
         initialize_sqrt_price: u128,
         uri: String,
+        asset_a_addr: address,
         asset_b_addr: address
     ) {
+        let asset_addr = utils::coin_to_fa_address<CoinType>();
+        assert!(asset_a_addr == asset_addr || asset_b_addr == asset_addr, ENOT_COIN_ASSET_ADDR);
+
         factory::create_pool(
             account,
             tick_spacing,
             initialize_sqrt_price,
             uri,
-            utils::coin_to_fa_address<CoinType>(),
+            asset_a_addr,
             asset_b_addr
         );
     }

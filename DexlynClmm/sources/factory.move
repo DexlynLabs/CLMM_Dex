@@ -4,6 +4,7 @@ module dexlyn_clmm::factory {
     use std::signer;
     use std::string::{Self, length, String};
     use aptos_std::comparator;
+    use aptos_std::comparator::compare;
     use aptos_std::table::{Self, Table};
 
     use supra_framework::account;
@@ -28,6 +29,9 @@ module dexlyn_clmm::factory {
 
     /// The initialize price is invalid
     const EINVALID_SQRTPRICE: u64 = 2;
+
+    /// The asset order is invalid
+    const EINVALID_ASSET_ORDER: u64 = 3;
 
     /// For support create pool by anyone, PoolOwner store a resource account signer_cap
     struct PoolOwner has key {
@@ -85,6 +89,7 @@ module dexlyn_clmm::factory {
         asset_b_addr: address
     ): address acquires PoolOwner, Pools {
         config::assert_pool_create_authority(account);
+        assert!(comparator::is_smaller_than(&compare(&asset_a_addr, &asset_b_addr)), EINVALID_ASSET_ORDER);
 
         let uri = if (length(&uri) == 0 || !config::allow_set_position_nft_uri(account)) {
             string::utf8(POOL_DEFAULT_URI)

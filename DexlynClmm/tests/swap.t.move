@@ -628,7 +628,7 @@ module dexlyn_clmm::swap_test {
         supra_framework = @supra_framework,
         admin = @dexlyn_clmm,
     )]
-    #[expected_failure(abort_code = pool::EPOOL_IS_PAUDED)] // E_POOL_PAUSED
+    #[expected_failure(abort_code = pool::EPOOL_IS_PAUSED)] // E_POOL_PAUSED
     public entry fun test_swap_pool_paused(admin: &signer, supra_framework: &signer) {
         account::create_account_for_test(signer::address_of(admin));
         timestamp::set_time_has_started_for_testing(supra_framework);
@@ -821,18 +821,21 @@ module dexlyn_clmm::swap_test {
         let init_sqrt_price = 18446744073709551616; // sqrt price at tick 0
         factory::init_factory_module(admin);
         add_fee_tier(admin, tick_spacing, 10000);
+
+        let a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(a_addr, b_addr);
+
         create_pool_coin_asset<TestCoinA>(
             admin,
             tick_spacing,
             init_sqrt_price,
             string::utf8(b""),
-            asset_b
+            asset_a_sorted,
+            asset_b_sorted
         );
 
-
-        let a_addr = utils::coin_to_fa_address<TestCoinA>();
-        let b_addr = utils::coin_to_fa_address<TestCoinB>();
-        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, a_addr, b_addr);
+        let clmm_pool_addr_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
         let pool_address = option::extract(&mut clmm_pool_addr_opt);
 
         let amount_a = 1000000;
@@ -889,7 +892,7 @@ module dexlyn_clmm::swap_test {
             asset_metadata
         );
         assert!(
-            (user_balance_a_after == user_balance_a_before - swap_amount) && (user_balance_b_after == user_balance_b_before + 8954),
+            (user_balance_a_after == user_balance_a_before + 8954) && (user_balance_b_after == user_balance_b_before - swap_amount),
             2
         );
     }
