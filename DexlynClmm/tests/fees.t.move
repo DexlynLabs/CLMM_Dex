@@ -15,7 +15,8 @@ module dexlyn_clmm::fees_test {
         collect_fee,
         collect_protocol_fee,
         remove_liquidity,
-        swap
+        swap,
+        pause_pool
     };
     use dexlyn_clmm::config;
     use dexlyn_clmm::factory;
@@ -391,5 +392,125 @@ module dexlyn_clmm::fees_test {
         let results = pool::calculate_positions_fees(pool_address, position_indices);
 
         assert!(vector::length(&results) == 2, 1);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    #[expected_failure(abort_code = pool::EPOOL_IS_PAUSED)]
+    public entry fun test_collect_fee_when_pool_paused(admin: &signer, supra_framework: &signer) {
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        factory::init_factory_module(admin);
+
+        let tick_spacing = 1;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 1000000;
+        let amount_b = 1000000;
+        let fix_a = true;
+        let tick_lower = 18446744073709541616; // -10000
+        let tick_upper = 10000;
+        let is_new_position = true;
+
+        add_fee_tier(admin, tick_spacing, 1000);
+
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b,
+        );
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            fix_a,
+            tick_lower,
+            tick_upper,
+            is_new_position,
+            0
+        );
+
+        let a2b = true;
+        let exact_input = true;
+        let amount = 100000;
+        let min_or_max = 0;
+        let price_limit = tick_math::min_sqrt_price() + 1;
+        let referral = string::utf8(b"");
+        swap(admin, pool_address, a2b, exact_input, amount, min_or_max, price_limit, referral);
+
+        pause_pool(admin, pool_address);
+
+        collect_fee(admin, pool_address, 1);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    #[expected_failure(abort_code = pool::EPOOL_IS_PAUSED)]
+    public entry fun test_abort_collect_protocol_fee_when_pool_paused(admin: &signer, supra_framework: &signer) {
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        factory::init_factory_module(admin);
+
+        let tick_spacing = 1;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 1000000;
+        let amount_b = 1000000;
+        let fix_a = true;
+        let tick_lower = 18446744073709541616; // -10000
+        let tick_upper = 10000;
+        let is_new_position = true;
+
+        add_fee_tier(admin, tick_spacing, 1000);
+
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b,
+        );
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            fix_a,
+            tick_lower,
+            tick_upper,
+            is_new_position,
+            0,
+        );
+
+        let a2b = true;
+        let exact_input = true;
+        let amount = 100000;
+        let min_or_max = 0;
+        let price_limit = tick_math::min_sqrt_price() + 1;
+        let referral = string::utf8(b"");
+        swap(admin, pool_address, a2b, exact_input, amount, min_or_max, price_limit, referral);
+
+        pause_pool(admin, pool_address);
+
+        collect_protocol_fee(admin, pool_address);
     }
 }

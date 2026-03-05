@@ -12,8 +12,10 @@ module dexlyn_clmm::clmm_router_test {
     use dexlyn_clmm::config;
     use dexlyn_clmm::factory;
     use dexlyn_clmm::partner;
+    use dexlyn_clmm::pool;
     use dexlyn_clmm::test_helpers::{Self, TestCoinA, TestCoinB};
     use dexlyn_clmm::utils;
+    use integer_mate::i64;
 
     #[test(
         supra_framework = @supra_framework,
@@ -165,8 +167,6 @@ module dexlyn_clmm::clmm_router_test {
 
         clmm_router::add_role(admin, signer::address_of(admin), 1);
 
-        // Update pool URI
-        clmm_router::update_pool_uri(admin, pool_address, utf8(b"new-uri"));
     }
 
     #[test(
@@ -405,6 +405,9 @@ module dexlyn_clmm::clmm_router_test {
             user, pool_address, integer_mate::i64::from_u64(tick_lower), integer_mate::i64::from_u64(tick_upper)
         );
 
+        coin::migrate_to_fungible_store<TestCoinA>(admin);
+        clmm_router::deposit_reward(admin, pool_address, 0, asset_a_addr, 1000000 * 30 * 24 * 60 * 60);
+
         // Collect rewarder (will only succeed if rewards are available)
         clmm_router::collect_rewarder(
             user,
@@ -412,6 +415,87 @@ module dexlyn_clmm::clmm_router_test {
             0, // rewarder_index
             pos_id,
             asset_a_addr
+        );
+
+        let one_week_seconds = 7 * 24 * 60 * 60;
+        clmm_router::update_rewarder_duration(admin, pool_address, 0, one_week_seconds);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+        user = @0x123
+    )]
+    #[expected_failure(abort_code = pool::EREWARD_NOT_MATCH_WITH_INDEX)]
+    public entry fun test_wrong_reward_asset_withdraw(
+        admin: &signer,
+        user: &signer,
+        supra_framework: &signer
+    ) {
+        coin::create_coin_conversion_map(supra_framework);
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        factory::init_factory_module(admin);
+        clmm_router::init_clmm_acl(admin);
+        test_helpers::mint_tokens(admin);
+
+        let tick_spacing = 1;
+        let fee_rate = 100;
+        clmm_router::add_fee_tier(admin, tick_spacing, fee_rate);
+
+        let init_sqrt_price = 18446744073709551616; // 1.0 as Q64.64
+        let asset_a_addr = utils::coin_to_fa_address<TestCoinA>();
+        let asset_b_addr = utils::coin_to_fa_address<TestCoinB>();
+        let (asset_a_sorted, asset_b_sorted) = utils::sort_tokens(asset_a_addr, asset_b_addr);
+
+        // Create pool with A/B pair
+        clmm_router::create_pool_coin_coin<TestCoinB, TestCoinA>(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            utf8(b""),
+            asset_a_sorted,
+            asset_b_sorted
+        );
+
+        let pool_opt = factory::get_pool(tick_spacing, asset_a_sorted, asset_b_sorted);
+        let pool_address = option::extract(&mut pool_opt);
+
+        let rewarder_index = 0;
+        clmm_router::initialize_rewarder(
+            admin,
+            pool_address,
+            signer::address_of(admin),
+            rewarder_index,
+            asset_a_addr // Configure Token A as reward token
+        );
+
+        let emissions_per_second = 1000;
+        clmm_router::update_rewarder_emission(
+            admin,
+            pool_address,
+            (rewarder_index as u8),
+            emissions_per_second,
+            asset_a_addr
+        );
+
+        let tick_lower = 18446744073709551216; // -400
+        let tick_upper = 400;
+        let pos_id = pool::open_position(
+            user,
+            pool_address,
+            i64::from_u64(tick_lower),
+            i64::from_u64(tick_upper)
+        );
+
+        timestamp::fast_forward_seconds(100);
+
+        clmm_router::collect_rewarder(
+            user,
+            pool_address,
+            0,
+            pos_id,
+            asset_b_addr // Request Token B instead of configured Token A
         );
     }
 }

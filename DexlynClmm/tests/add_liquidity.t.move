@@ -5,8 +5,12 @@ module dexlyn_clmm::add_liquidity_test {
     use std::string::{Self, utf8};
     use std::vector;
 
+    use aptos_token_objects::token;
     use supra_framework::account;
     use supra_framework::coin::{Self, migrate_to_fungible_store};
+    use supra_framework::fungible_asset::{Self, Metadata};
+    use supra_framework::object;
+    use supra_framework::primary_fungible_store;
     use supra_framework::timestamp;
 
     use dexlyn_clmm::clmm_math;
@@ -21,6 +25,7 @@ module dexlyn_clmm::add_liquidity_test {
         create_pool_coin_coin,
         remove_liquidity
     };
+    use dexlyn_clmm::config;
     use dexlyn_clmm::factory;
     use dexlyn_clmm::fee_tier;
     use dexlyn_clmm::fee_tier::get_fee_rate;
@@ -33,8 +38,10 @@ module dexlyn_clmm::add_liquidity_test {
         TestCoinA,
         TestCoinB
     };
+    use dexlyn_clmm::tick_math;
     use dexlyn_clmm::token_factory;
     use dexlyn_clmm::utils;
+    use integer_mate::i64;
 
     #[test(
         supra_framework = @supra_framework,
@@ -186,6 +193,156 @@ module dexlyn_clmm::add_liquidity_test {
 
         let pool_liquidity2 = get_pool_liquidity(pool_address);
         assert!(pool_liquidity2 == 0, 2003);
+    }
+
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+        user_a = @0xA,
+        user_b = @0xB,
+    )]
+    public entry fun test_update_collection_and_nfts_uri(
+        user_a: &signer,
+        user_b: &signer,
+        supra_framework: &signer,
+        admin: &signer
+    ) {
+        // Setup: mint tokens to user_a
+        account::create_account_for_test(signer::address_of(admin));
+        account::create_account_for_test(signer::address_of(user_a));
+        account::create_account_for_test(signer::address_of(user_b));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        let tick_spacing = 200;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 100000;
+        let amount_b = 400000;
+        let tick_lower = 18446744073709551216; // -400
+        let tick_upper = 16000;
+        let fee_rate = 1000;
+
+
+        factory::init_factory_module(admin);
+        config::init_clmm_acl(admin);
+        config::add_role(admin, signer::address_of(admin), 1);
+        config::add_role(admin, signer::address_of(admin), 2);
+
+        add_fee_tier(admin, tick_spacing, fee_rate);
+        assert!(fee_rate == get_fee_rate(tick_spacing), 2001);
+
+
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b"init"),
+            token_a,
+            token_b,
+        );
+        let pool_index = dexlyn_clmm::pool::get_pool_index(pool_address);
+
+        let position_index = 1;
+        let collection = dexlyn_clmm::position_nft::collection_name(tick_spacing, token_a, token_b);
+        let nft_name = dexlyn_clmm::position_nft::position_name(pool_index, position_index);
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            true,
+            tick_lower,
+            tick_upper,
+            true,
+            0,
+        );
+
+        let pool_liquidity = get_pool_liquidity(pool_address);
+        assert!(pool_liquidity == 181602, 2002); // min[181602.549077, 20201666.612228]
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            true,
+            tick_lower,
+            tick_upper,
+            true,
+            0,
+        );
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            true,
+            tick_lower,
+            tick_upper,
+            true,
+            0,
+        );
+
+        add_liquidity_fix_value(
+            admin,
+            pool_address,
+            amount_a,
+            amount_b,
+            true,
+            tick_lower,
+            tick_upper,
+            true,
+            0,
+        );
+
+        let token_address = aptos_token_objects::token::create_token_address(
+            &pool_address,
+            &collection,
+            &nft_name
+        );
+
+        // check nft owner and is vaild
+        let is_valid_nft = position_nft::is_valid_nft(token_address, pool_address);
+        assert!(is_valid_nft == true, 1001);
+
+        let token_obj = aptos_framework::object::address_to_object<aptos_token_objects::token::Token>(token_address);
+        let uri = string::utf8(b"init");
+        let token_uri = token::uri(token_obj);
+        assert!(token_uri == uri, 1001); // check inital token uri
+
+        // update uri
+        pool::update_collection_and_nfts_uri(admin, pool_address, string::utf8(b"new_updated_uri"), 0, 10);
+
+        let token_uri2 = token::uri(token_obj);
+        let uri_update1 = string::utf8(b"new_updated_uri");
+        assert!(token_uri2 == uri_update1, 1002); // check updated token uri
+
+        aptos_framework::object::transfer(admin, token_obj, signer::address_of(user_b));
+
+        // get the NFT details from Token Address
+        let vec_token_address = vector[token_address, token_address];
+        let _nft_details = position_nft::get_nft_details(vec_token_address);
+
+
+        remove_liquidity(
+            admin,
+            pool_address,
+            181602,
+            0,
+            0,
+            2,
+            true
+        );
+
+        pool::update_collection_and_nfts_uri(admin, pool_address, string::utf8(b"again_updated_uri"), 0, 10);
+        let uri_update2 = string::utf8(b"again_updated_uri");
+        let token_uri3 = token::uri(token_obj);
+        assert!(token_uri3 == uri_update2, 1002); // check again updated token uri
     }
 
     #[test(
@@ -600,7 +757,7 @@ module dexlyn_clmm::add_liquidity_test {
         supra_framework = @supra_framework,
         admin = @dexlyn_clmm,
     )]
-    #[expected_failure(abort_code = pool::EAMOUNT_INCORRECT)] // EAMOUNT_INCORRECT
+    #[expected_failure(abort_code = pool::EAMOUNT_IS_ZERO)] // EAMOUNT_IS_ZERO
     public entry fun test_insufficient_liquidity(admin: &signer, supra_framework: &signer) {
         account::create_account_for_test(signer::address_of(admin));
         timestamp::set_time_has_started_for_testing(supra_framework);
@@ -1176,8 +1333,306 @@ module dexlyn_clmm::add_liquidity_test {
 
 
         let pool_addresses = vector[pool_address1, pool_address2, pool_address3];
-        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, true, 100000);
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, true, false, 100000);
 
         assert!(best_pool == pool_address3, 9001);
+
+        let swap_results = pool::calculate_all_pools_swap_results(pool_addresses, true, true, 100000);
+        assert!(vector::length(&swap_results) == 3, 9002);
+
+        // exact amount_out for a2b
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, false, true, 100000);
+
+        // pool1: 100644+101=100745, pool2:100084+51=100135, pool3:100120+11=100131
+        assert!(best_pool == pool_address3, 9002);
+
+        // exact input for b2a
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, false, true, false, 100000);
+
+        //amount_out: pool1: 99266, pool2:99866, pool3:99870
+        assert!(best_pool == pool_address3, 9003);
+
+        // exact output for b2a
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, false, false, true, 100000);
+
+        // amount_in: pool1: 100644+101=100745, pool2:100084+51=100135, pool3:100120+11=100131
+        assert!(best_pool == pool_address3, 9004);
+
+        // all pool exceeds: a2b when is_exceed=false, by_amount_in=false
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, false, true, 100000000);
+        assert!(best_pool == @0x0, 9005);
+
+        // all pool exceeds: a2b when is_exceed=false, by_amount_in=true
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, true, false, 100000000000);
+        assert!(best_pool == @0x0, 9006);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    public entry fun test_find_best_swap_for_same_amount_out_when_pool_exceeds(
+        admin: &signer,
+        supra_framework: &signer
+    ) {
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        let tick_spacing = 200;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 100000000;
+        let amount_b = 100000000;
+        let tick_lower = 18446744073709551016;
+        let tick_upper = 600;
+
+        let fee_rate1 = 1000;
+        let fee_rate2 = 500;
+        let fee_rate3 = 100;
+
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, tick_spacing, fee_rate1);
+
+
+        // Create two pools
+        let pool_address1 = factory::create_pool(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), token_a, token_b
+        );
+
+        // Add different liquidity to each pool
+        add_liquidity_fix_value(
+            admin, pool_address1, amount_a, amount_b, true, tick_lower, tick_upper, true, 0
+        );
+
+
+        let tick_spacing = 60;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 100000000;
+        let amount_b = 100000000;
+        let tick_lower = 18446744073709551016;
+        let tick_upper = 600;
+        add_fee_tier(admin, tick_spacing, fee_rate2);
+
+        let pool_address2 = factory::create_pool(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), token_a, token_b
+        );
+
+        add_liquidity_fix_value(
+            admin, pool_address2, amount_a, amount_b, true, tick_lower, tick_upper, true, 0
+        );
+
+
+        let tick_spacing = 30;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 100000000;
+        let amount_b = 100000000;
+        let tick_lower = 18446744073709551016;
+        let tick_upper = 600;
+        add_fee_tier(admin, tick_spacing, fee_rate3);
+
+        let pool_address3 = factory::create_pool(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), token_a, token_b
+        );
+
+        add_liquidity_fix_value(
+            admin, pool_address3, amount_a, amount_b, true, tick_lower, tick_upper, true, 0
+        );
+
+
+        let pool_addresses = vector[pool_address1, pool_address2, pool_address3];
+
+        // same amount_out for b2a when is_exceed=true, by_amount_in=false
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, false, false, false, 100000000);
+        assert!(best_pool == pool_address3, 9001);
+
+        // same amount_out for a2b, is_exceed:true
+        let (best_pool, _best_amount) = pool::swap_routing(pool_addresses, true, false, false, 100000000000);
+        assert!(best_pool == pool_address3, 9002);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    #[expected_failure(abort_code = pool::EDIFFERENT_ASSET_TYPE)]
+    public fun test_repay_add_liquidity_with_wrong_assets_fails_on_withdraw(
+        admin: &signer,
+        supra_framework: &signer
+    ) {
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        factory::init_factory_module(admin);
+
+        let asset_a_addr = setup_fungible_assets(admin, utf8(b"USDC"), utf8(b"USDC"));
+        let asset_b_addr = setup_fungible_assets(admin, utf8(b"USDT"), utf8(b"USDT"));
+
+        let tick_spacing = 1;
+        let fee_rate = 2000;
+        let init_sqrt_price = tick_math::get_sqrt_price_at_tick(i64::from(0));
+        add_fee_tier(admin, tick_spacing, fee_rate);
+
+        let pool_address = factory::create_pool(
+            admin, tick_spacing, init_sqrt_price, string::utf8(b""), asset_a_addr, asset_b_addr
+        );
+
+        let pos_index = pool::open_position(
+            admin,
+            pool_address,
+            i64::neg_from(50000),
+            i64::from(50000)
+        );
+        let liq = 10_000_000u128;
+        let receipt = pool::add_liquidity_v2(admin, pool_address, liq, pos_index);
+        let (amt_a_needed, amt_b_needed) = pool::add_liqudity_pay_amount(&receipt);
+
+        let wrong_x_addr = setup_fungible_assets(admin, utf8(b"Wrong X"), utf8(b"WX"));
+        let wrong_y_addr = setup_fungible_assets(admin, utf8(b"Wrong Y"), utf8(b"WY"));
+        let wrong_x_metadata = object::address_to_object<Metadata>(wrong_x_addr);
+        let wrong_y_metadata = object::address_to_object<Metadata>(wrong_y_addr);
+
+        let token_x = if (amt_a_needed > 0) {
+            primary_fungible_store::withdraw(admin, wrong_x_metadata, amt_a_needed)
+        } else {
+            fungible_asset::zero(wrong_x_metadata)
+        };
+        let token_y = if (amt_b_needed > 0) {
+            primary_fungible_store::withdraw(admin, wrong_y_metadata, amt_b_needed)
+        } else {
+            fungible_asset::zero(wrong_y_metadata)
+        };
+
+        pool::repay_add_liquidity(token_x, token_y, receipt);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+        owner = @0xA,
+        non_owner = @0xB,
+    )]
+    #[expected_failure(abort_code = pool::EPOSITION_OWNER_ERROR)]
+    public fun test_add_liquidity_v2_only_owner_can_add(
+        admin: &signer,
+        owner: &signer,
+        non_owner: &signer,
+        supra_framework: &signer
+    ) {
+        account::create_account_for_test(signer::address_of(admin));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(non_owner));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        let tick_spacing = 200;
+        let init_sqrt_price = 18446744073709551616;
+        let fee_rate = 1000;
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, tick_spacing, fee_rate);
+        
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b,
+        );
+
+        let tick_lower = 18446744073709551216; // -400
+        let tick_upper = 16000;
+        let pos_index = pool::open_position(
+            owner,
+            pool_address,
+            i64::from_u64(tick_lower),
+            i64::from_u64(tick_upper)
+        );
+
+        let liquidity = 1000000u128;
+        let receipt = pool::add_liquidity_v2(owner, pool_address, liquidity, pos_index);
+        let (amt_a_needed, amt_b_needed) = pool::add_liqudity_pay_amount(&receipt);
+        
+        let a_metadata = object::address_to_object<Metadata>(token_a);
+        let b_metadata = object::address_to_object<Metadata>(token_b);
+        let token_a_asset = primary_fungible_store::withdraw(admin, a_metadata, amt_a_needed);
+        let token_b_asset = primary_fungible_store::withdraw(admin, b_metadata, amt_b_needed);
+        pool::repay_add_liquidity(token_a_asset, token_b_asset, receipt);
+
+        let receipt2 = pool::add_liquidity_v2(non_owner, pool_address, liquidity, pos_index);
+        
+        let (amt_a_needed2, amt_b_needed2) = pool::add_liqudity_pay_amount(&receipt2);
+        let token_a_asset2 = primary_fungible_store::withdraw(admin, a_metadata, amt_a_needed2);
+        let token_b_asset2 = primary_fungible_store::withdraw(admin, b_metadata, amt_b_needed2);
+        pool::repay_add_liquidity(token_a_asset2, token_b_asset2, receipt2);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+        owner = @0xA,
+        non_owner = @0xB,
+    )]
+    #[expected_failure(abort_code = pool::EPOSITION_OWNER_ERROR)]
+    public fun test_add_liquidity_fix_asset_v2_only_owner_can_add(
+        admin: &signer,
+        owner: &signer,
+        non_owner: &signer,
+        supra_framework: &signer
+    ) {
+        account::create_account_for_test(signer::address_of(admin));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(non_owner));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        
+        let (token_a_name, token_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"TA"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"TB"));
+
+        let tick_spacing = 200;
+        let init_sqrt_price = 18446744073709551616;
+        let fee_rate = 1000;
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, tick_spacing, fee_rate);
+        
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b,
+        );
+
+        let tick_lower = 18446744073709551216; // -400
+        let tick_upper = 16000;
+        let pos_index = pool::open_position(
+            owner,
+            pool_address,
+            i64::from_u64(tick_lower),
+            i64::from_u64(tick_upper)
+        );
+
+        let amount = 100000u64;
+        let fix_amount_a = true;
+        let receipt = pool::add_liquidity_fix_asset_v2(owner, pool_address, amount, fix_amount_a, pos_index);
+        let (amt_a_needed, amt_b_needed) = pool::add_liqudity_pay_amount(&receipt);
+        
+        let a_metadata = object::address_to_object<Metadata>(token_a);
+        let b_metadata = object::address_to_object<Metadata>(token_b);
+        let token_a_asset = primary_fungible_store::withdraw(admin, a_metadata, amt_a_needed);
+        let token_b_asset = primary_fungible_store::withdraw(admin, b_metadata, amt_b_needed);
+        pool::repay_add_liquidity(token_a_asset, token_b_asset, receipt);
+
+        let receipt2 = pool::add_liquidity_fix_asset_v2(non_owner, pool_address, amount, fix_amount_a, pos_index);
+        
+        let (amt_a_needed2, amt_b_needed2) = pool::add_liqudity_pay_amount(&receipt2);
+        let token_a_asset2 = primary_fungible_store::withdraw(admin, a_metadata, amt_a_needed2);
+        let token_b_asset2 = primary_fungible_store::withdraw(admin, b_metadata, amt_b_needed2);
+        pool::repay_add_liquidity(token_a_asset2, token_b_asset2, receipt2);
     }
 }

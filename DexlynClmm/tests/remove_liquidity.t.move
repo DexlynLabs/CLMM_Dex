@@ -12,8 +12,7 @@ module dexlyn_clmm::remove_liquidity_test {
         add_fee_tier,
         add_liquidity,
         add_liquidity_fix_value,
-        collect_fee,
-        remove_liquidity
+        collect_fee, remove_liquidity
     };
     use dexlyn_clmm::factory;
     use dexlyn_clmm::pool;
@@ -277,7 +276,7 @@ module dexlyn_clmm::remove_liquidity_test {
         supra_framework = @supra_framework,
         admin = @dexlyn_clmm,
     )]
-    #[expected_failure(abort_code = clmm_router::EAMOUNT_OUT_BELOW_MIN_LIMIT)] // EAMOUNT_OUT_BELOW_MIN_LIMIT
+    #[expected_failure(abort_code = clmm_router::EAMOUNT_OUT_A_BELOW_MIN_LIMIT)] // EAMOUNT_OUT_A_BELOW_MIN_LIMIT
     public entry fun test_remove_liquidity_insufficient_amounts(admin: &signer, supra_framework: &signer) {
         account::create_account_for_test(signer::address_of(admin));
         timestamp::set_time_has_started_for_testing(supra_framework);
@@ -452,5 +451,115 @@ module dexlyn_clmm::remove_liquidity_test {
         // balance after second removal
         assert!(user_balance_a_after2 == user_balance_a_after + 12371, 1003);
         assert!(user_balance_b_after2 == user_balance_b_after, 1004);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    #[expected_failure(abort_code = pool::EPOOL_IS_PAUSED)]
+    public entry fun test_remove_liquidity_pool_paused(admin: &signer, supra_framework: &signer) {
+        account::create_account_for_test(address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        let (token_a_name, token_b_name) = (utf8(b"Usdt"), utf8(b"Bitcoin"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"USDT"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"BTC"));
+
+        let tick_spacing = 2;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 10000;
+        let amount_b = 10000;
+        let tick_lower = 18446744073709551216;
+        let tick_upper = 400;
+        let is_new_position = true;
+
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, tick_spacing, 1000);
+
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b
+        );
+
+        add_liquidity(
+            admin,
+            pool_address,
+            20000,
+            amount_a,
+            amount_b,
+            tick_lower,
+            tick_upper,
+            is_new_position,
+            0
+        );
+
+        clmm_router::pause_pool(admin, pool_address);
+
+        remove_liquidity(
+            admin,
+            pool_address,
+            5000,
+            0,
+            0,
+            1,
+            false
+        );
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        admin = @dexlyn_clmm,
+    )]
+    #[expected_failure(abort_code = pool::EPOOL_IS_PAUSED)]
+    public entry fun test_checked_close_position_fail_when_pool_paused(admin: &signer, supra_framework: &signer) {
+        account::create_account_for_test(signer::address_of(admin));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        let (token_a_name, token_b_name) = (utf8(b"Usdt"), utf8(b"Bitcoin"));
+        let token_a = setup_fungible_assets(admin, token_a_name, utf8(b"USDT"));
+        let token_b = setup_fungible_assets(admin, token_b_name, utf8(b"BTC"));
+
+        let tick_spacing = 2;
+        let init_sqrt_price = 18446744073709551616;
+        let amount_a = 5000;
+        let amount_b = 5000;
+        let tick_lower = 18446744073709551216;
+        let tick_upper = 400;
+        let is_new_position = true;
+
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, tick_spacing, 1000);
+
+        let pool_address = factory::create_pool(
+            admin,
+            tick_spacing,
+            init_sqrt_price,
+            string::utf8(b""),
+            token_a,
+            token_b
+        );
+
+        add_liquidity(
+            admin,
+            pool_address,
+            5000,
+            amount_a,
+            amount_b,
+            tick_lower,
+            tick_upper,
+            is_new_position,
+            0
+        );
+
+        clmm_router::pause_pool(admin, pool_address);
+
+        let _ = pool::checked_close_position(
+            admin,
+            pool_address,
+            1
+        );
     }
 }

@@ -8,7 +8,8 @@ module dexlyn_clmm::swap_test {
 
     use supra_framework::account;
     use supra_framework::coin;
-    use supra_framework::fungible_asset;
+    use supra_framework::fungible_asset::{Self, Metadata};
+    use supra_framework::object;
     use supra_framework::primary_fungible_store;
     use supra_framework::timestamp;
 
@@ -81,12 +82,6 @@ module dexlyn_clmm::swap_test {
         let user_balance_a_before = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
-        let price_limit: u128 = if (atob) {
-            tick_math::min_sqrt_price() + 1
-        }   else {
-            tick_math::min_sqrt_price() - 1
-        };
-
         swap(
             admin,
             pool_address,
@@ -94,7 +89,7 @@ module dexlyn_clmm::swap_test {
             true, // exact_input
             swap_amount,
             min_output,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -160,12 +155,6 @@ module dexlyn_clmm::swap_test {
         let swap_amount = 10000;
         let max_input = 1000000;
 
-        let price_limit: u128 = if (!atob) {
-            tick_math::max_sqrt_price() - 1
-        }   else {
-            tick_math::min_sqrt_price() + 1
-        };
-
         let user_balance_a_before = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
 
@@ -176,7 +165,7 @@ module dexlyn_clmm::swap_test {
             false,
             swap_amount,
             max_input,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -319,7 +308,7 @@ module dexlyn_clmm::swap_test {
             true,
             small_amount,
             0,
-            tick_math::min_sqrt_price() + 1,
+            0,
             string::utf8(b""),
         );
 
@@ -340,7 +329,7 @@ module dexlyn_clmm::swap_test {
             true,
             large_amount,
             0,
-            tick_math::min_sqrt_price() + 1,
+            0,
             string::utf8(b""),
         );
 
@@ -358,7 +347,7 @@ module dexlyn_clmm::swap_test {
             true,
             10000,
             0,
-            tick_math::max_sqrt_price() - 1,
+            0,
             string::utf8(b""),
         );
 
@@ -412,7 +401,6 @@ module dexlyn_clmm::swap_test {
 
         let swap_amount = 500000;
         let min_output = 0;
-        let price_limit = tick_math::min_sqrt_price() + 1;
 
         let user_balance_a_before = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
@@ -424,7 +412,7 @@ module dexlyn_clmm::swap_test {
             true, // exact_input
             swap_amount,
             min_output,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -512,7 +500,6 @@ module dexlyn_clmm::swap_test {
         // Perform swap that crosses all positions
         let swap_amount = 2000000;
         let min_output = 0;
-        let price_limit = tick_math::min_sqrt_price() + 1;
 
         let user_balance_a_before = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
@@ -524,7 +511,7 @@ module dexlyn_clmm::swap_test {
             true,
             swap_amount,
             min_output,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -599,7 +586,6 @@ module dexlyn_clmm::swap_test {
 
         let swap_amount = 150000;
         let min_output = 0;
-        let price_limit = tick_math::min_sqrt_price() + 1;
 
         let user_balance_a_before = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
         let user_balance_b_before = token_factory::get_token_balance(admin, address_of(admin), token_b_name);
@@ -611,7 +597,7 @@ module dexlyn_clmm::swap_test {
             true,
             swap_amount,
             min_output,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -668,7 +654,7 @@ module dexlyn_clmm::swap_test {
             true,
             1000,
             0,
-            tick_math::min_sqrt_price() + 1,
+            0,
             string::utf8(b""),
         );
     }
@@ -718,7 +704,7 @@ module dexlyn_clmm::swap_test {
             true,
             small_swap,
             0,
-            tick_math::max_sqrt_price() - 1,
+            0,
             string::utf8(b""),
         );
         let user_balance_a_after = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
@@ -735,7 +721,7 @@ module dexlyn_clmm::swap_test {
             true,
             large_swap,
             0,
-            tick_math::max_sqrt_price() - 1,
+            0,
             string::utf8(b""),
         );
         let user_balance_a_after2 = token_factory::get_token_balance(admin, address_of(admin), token_a_name);
@@ -793,7 +779,7 @@ module dexlyn_clmm::swap_test {
             true,
             swap_amount,
             0,
-            tick_math::min_sqrt_price() + 1,
+            0,
             string::utf8(b""),
         );
 
@@ -815,7 +801,6 @@ module dexlyn_clmm::swap_test {
         timestamp::set_time_has_started_for_testing(supra_framework);
         mint_tokens(admin);
         coin::migrate_to_fungible_store<TestCoinB>(admin);
-        let asset_b = utils::coin_to_fa_address<TestCoinB>();
 
         let tick_spacing = 200;
         let init_sqrt_price = 18446744073709551616; // sqrt price at tick 0
@@ -869,12 +854,6 @@ module dexlyn_clmm::swap_test {
             asset_metadata
         );
 
-        let price_limit: u128 = if (atob) {
-            tick_math::min_sqrt_price() + 1
-        }   else {
-            tick_math::min_sqrt_price() - 1
-        };
-
         swap_coin<TestCoinA>(
             admin,
             pool_address,
@@ -882,7 +861,7 @@ module dexlyn_clmm::swap_test {
             true, // exact_input
             swap_amount,
             min_output,
-            price_limit,
+            0,
             string::utf8(b""),
         );
 
@@ -895,5 +874,93 @@ module dexlyn_clmm::swap_test {
             (user_balance_a_after == user_balance_a_before + 8954) && (user_balance_b_after == user_balance_b_before - swap_amount),
             2
         );
+    }
+
+    #[test(
+        supra= @supra_framework,
+        admin = @dexlyn_clmm,
+        alice= @0x153,
+        bob= @0x253
+    )]
+    #[expected_failure(abort_code = pool::EDIFFERENT_ASSET_TYPE)]
+    public fun test_token_type_validation_exploit(admin: &signer, alice: &signer, bob: &signer, supra: &signer) {
+        timestamp::set_time_has_started_for_testing(supra);
+        factory::init_factory_module(admin);
+        add_fee_tier(admin, 1, 1000u64);
+        let admin_addr = signer::address_of(admin);
+
+        let (usdc_name, usdt_name) = (utf8(b"USDC"), utf8(b"USDT"));
+        let usdc = setup_fungible_assets(admin, usdc_name, utf8(b"USDC"));
+        let usdt = setup_fungible_assets(admin, usdt_name, utf8(b"USDT"));
+        let usdc_metadata = object::address_to_object<Metadata>(usdc);
+        let usdt_metadata = object::address_to_object<Metadata>(usdt);
+
+        let pool_addr = factory::create_pool(
+            alice,
+            1, // tick_spacing
+            18446744073709551616u128, // 1:1 sqrt price (Q64.64)
+            string::utf8(b""),
+            usdc,
+            usdt
+        );
+
+        add_liquidity_fix_value(
+            admin,
+            pool_addr,
+            10000000,
+            10000000,
+            true,
+            18446744073709549616, // -2000
+            2000,
+            true,
+            0,
+        );
+
+        let alice_position = pool::open_position(
+            alice,
+            pool_addr,
+            integer_mate::i64::neg_from(120u64), // tick_lower
+            integer_mate::i64::from_u64(120u64)  // tick_upper
+        );
+
+        let receipt = pool::add_liquidity_v2(alice, pool_addr, 10000u128, alice_position);
+        let (amount_a, amount_b) = pool::add_liqudity_pay_amount(&receipt);
+
+        let a_deposit = primary_fungible_store::withdraw(admin, usdc_metadata, amount_a);
+        let b_deposit = primary_fungible_store::withdraw(admin, usdt_metadata, amount_b);
+        pool::repay_add_liquidity(a_deposit, b_deposit, receipt);
+
+        // Bob creates fake token
+        let fake_addr = setup_fungible_assets(admin, utf8(b"FAKE"), utf8(b"FAKE"));
+        let fake_metadata = object::address_to_object<Metadata>(fake_addr);
+
+        let a2b = true;
+        let (out_a, out_b, flash_receipt) = pool::flash_swap(
+            pool_addr,
+            signer::address_of(bob),
+            string::utf8(b""),
+            a2b,
+            true, // by_amount_in
+            5000,
+            tick_math::min_sqrt_price()
+        );
+
+        let required_usdc = pool::swap_pay_amount(&flash_receipt);
+
+        dexlyn_clmm::token_factory::transfer_token(
+            admin,
+            admin_addr,
+            signer::address_of(bob),
+            utf8(b"FAKE"),
+            100000000000
+        );
+
+        primary_fungible_store::deposit(signer::address_of(bob), out_b);
+        fungible_asset::destroy_zero(out_a);
+
+        let fake_repayment = primary_fungible_store::withdraw(bob, fake_metadata, required_usdc);
+
+        let zero_b = fungible_asset::zero(usdt_metadata);
+        pool::repay_flash_swap(fake_repayment, zero_b, flash_receipt);
     }
 }
