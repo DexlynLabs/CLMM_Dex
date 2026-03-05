@@ -12,6 +12,7 @@ module dexlyn_clmm::clmm_router {
     use dexlyn_clmm::fee_tier;
     use dexlyn_clmm::partner;
     use dexlyn_clmm::pool;
+    use dexlyn_clmm::tick_math;
     use dexlyn_clmm::utils;
     use integer_mate::i64;
 
@@ -21,32 +22,39 @@ module dexlyn_clmm::clmm_router {
     /// returned amount B is below the minimum limit
     const EAMOUNT_OUT_BELOW_MIN_LIMIT: u64 = 2;
 
-    /// the tick is not valid for the pool
-    const EIS_NOT_VALID_TICK: u64 = 3;
-
-    /// the liquidity is not valid for the pool
-    const EINVALID_LIQUIDITY: u64 = 4;
-
-    /// the pool address is not valid
-    const EPOOL_ADDRESS_ERROR: u64 = 5;
-
-    /// the pool pair is not valid
-    const EINVALID_POOL_PAIR: u64 = 6;
-
-    /// the swap amount is incorrect
-    const ESWAP_AMOUNT_INCORRECT: u64 = 7;
-
-    /// the position index is not valid
-    const EPOSITION_INDEX_ERROR: u64 = 8;
-
     /// the position is not zero, can not close it.
-    const EPOSITION_IS_NOT_ZERO: u64 = 9;
+    const EPOSITION_IS_NOT_ZERO: u64 = 3;
 
     /// The asset addresses are out of sequence from CoinType
-    const ESEQUENTIAL_MISMTACH: u64 = 10;
+    const ESEQUENTIAL_MISMTACH: u64 = 4;
 
     ///One of the asset address is not matching with the CoinType converted FA address
-    const ENOT_COIN_ASSET_ADDR: u64 = 11;
+    const ENOT_COIN_ASSET_ADDR: u64 = 5;
+
+    /// required amount A exceeds the maximum allowed value
+    const EAMOUNT_A_ABOVE_MAX_LIMIT: u64 = 6;
+
+    /// required amount B exceeds the maximum allowed value
+    const EAMOUNT_B_ABOVE_MAX_LIMIT: u64 = 7;
+
+    /// the lower tick is not valid
+    const EIS_NOT_VALID_LOWER_TICK: u64 = 8;
+
+    /// the upper tick is not valid
+    const EIS_NOT_VALID_UPPER_TICK: u64 = 9;
+
+    /// returned amount A is below the minimum limit
+    const EAMOUNT_OUT_A_BELOW_MIN_LIMIT: u64 = 10;
+
+    /// returned amount B is below the minimum limit
+    const EAMOUNT_OUT_B_BELOW_MIN_LIMIT: u64 = 11;
+
+    /// the swap in amount is incorrect
+    const ESWAP_IN_AMOUNT_INCORRECT: u64 = 12;
+
+    /// the swap out amount is incorrect
+    const ESWAP_OUT_AMOUNT_INCORRECT: u64 = 13;
+
 
     /// Transfer the `protocol_authority` to new authority.
     /// Params
@@ -233,8 +241,8 @@ module dexlyn_clmm::clmm_router {
     ///     - max_amount_b: the max number of asset_b can be consumed by the pool.
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity_coin_coin<CoinTypeA, CoinTypeB>(
         account: &signer,
@@ -244,7 +252,7 @@ module dexlyn_clmm::clmm_router {
         max_amount_b: u64,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         coin::migrate_to_fungible_store<CoinTypeA>(account);
@@ -257,7 +265,7 @@ module dexlyn_clmm::clmm_router {
             max_amount_b,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             position_index,
         )
     }
@@ -271,8 +279,8 @@ module dexlyn_clmm::clmm_router {
     ///     - max_amount_b: the max number of asset_b can be consumed by the pool.
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity_coin_asset<CoinType>(
         account: &signer,
@@ -282,7 +290,7 @@ module dexlyn_clmm::clmm_router {
         max_amount_b: u64,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         coin::migrate_to_fungible_store<CoinType>(account);
@@ -294,7 +302,7 @@ module dexlyn_clmm::clmm_router {
             max_amount_b,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             position_index,
         )
     }
@@ -308,8 +316,8 @@ module dexlyn_clmm::clmm_router {
     ///     - max_amount_b: the max number of asset_b can be consumed by the pool.
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity(
         account: &signer,
@@ -319,7 +327,7 @@ module dexlyn_clmm::clmm_router {
         max_amount_b: u64,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         add_liquidity_internal(
@@ -330,7 +338,7 @@ module dexlyn_clmm::clmm_router {
             max_amount_b,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             position_index,
         )
     }
@@ -343,13 +351,13 @@ module dexlyn_clmm::clmm_router {
         max_amount_b: u64,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         // Open position if needed.
         let tick_lower_index = i64::from_u64(tick_lower);
         let tick_upper_index = i64::from_u64(tick_upper);
-        let pos_index = if (is_open) {
+        let pos_index = if (open_new_position) {
             pool::open_position(
                 account,
                 pool_address,
@@ -360,20 +368,21 @@ module dexlyn_clmm::clmm_router {
             pool::check_position_authority(account, pool_address, position_index);
             let (position_tick_lower, position_tick_upper) =
                 pool::get_position_tick_range(pool_address, position_index);
-            assert!(i64::eq(tick_lower_index, position_tick_lower), EIS_NOT_VALID_TICK);
-            assert!(i64::eq(tick_upper_index, position_tick_upper), EIS_NOT_VALID_TICK);
+            assert!(i64::eq(tick_lower_index, position_tick_lower), EIS_NOT_VALID_LOWER_TICK);
+            assert!(i64::eq(tick_upper_index, position_tick_upper), EIS_NOT_VALID_UPPER_TICK);
             position_index
         };
 
         // Add liquidity
-        let receipt = pool::add_liquidity(
+        let receipt = pool::add_liquidity_v2(
+            account,
             pool_address,
             delta_liquidity,
             pos_index
         );
         let (amount_a_needed, amount_b_needed) = pool::add_liqudity_pay_amount(&receipt);
-        assert!(amount_a_needed <= max_amount_a, EAMOUNT_IN_ABOVE_MAX_LIMIT);
-        assert!(amount_b_needed <= max_amount_b, EAMOUNT_IN_ABOVE_MAX_LIMIT);
+        assert!(amount_a_needed <= max_amount_a, EAMOUNT_A_ABOVE_MAX_LIMIT);
+        assert!(amount_b_needed <= max_amount_b, EAMOUNT_B_ABOVE_MAX_LIMIT);
 
         let (asset_a_addr, asset_b_addr) = pool::get_pool_assets(pool_address);
 
@@ -403,8 +412,8 @@ module dexlyn_clmm::clmm_router {
     ///     - fix_amount_a: control whether asset_a or asset_b amount is fixed
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity_fix_value_coin_coin<CoinTypeA, CoinTypeB>(
         account: &signer,
@@ -414,7 +423,7 @@ module dexlyn_clmm::clmm_router {
         fix_amount_a: bool,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         index: u64,
     ) {
         coin::migrate_to_fungible_store<CoinTypeA>(account);
@@ -427,7 +436,7 @@ module dexlyn_clmm::clmm_router {
             fix_amount_a,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             index,
         )
     }
@@ -442,8 +451,8 @@ module dexlyn_clmm::clmm_router {
     ///     - fix_amount_a: control whether asset_a or asset_b amount is fixed
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity_fix_value_coin_asset<CoinType>(
         account: &signer,
@@ -453,7 +462,7 @@ module dexlyn_clmm::clmm_router {
         fix_amount_a: bool,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         coin::migrate_to_fungible_store<CoinType>(account);
@@ -465,7 +474,7 @@ module dexlyn_clmm::clmm_router {
             fix_amount_a,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             position_index,
         )
     }
@@ -479,8 +488,8 @@ module dexlyn_clmm::clmm_router {
     ///     - fix_amount_a: control whether asset_a or asset_b amount is fixed
     ///     - tick_lower
     ///     - tick_upper
-    ///     - is_open: control whether or not to create a new position or add liquidity on existed position.
-    ///     - index: position index. if `is_open` is true, index is no use.
+    ///     - open_new_position: control whether or not to create a new position or add liquidity on existed position.
+    ///     - index: position index. if `open_new_position` is true, index is no use.
     /// Returns
     public entry fun add_liquidity_fix_value(
         account: &signer,
@@ -490,7 +499,7 @@ module dexlyn_clmm::clmm_router {
         fix_amount_a: bool,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         index: u64,
     ) {
         add_liquidity_fix_value_internal(
@@ -501,7 +510,7 @@ module dexlyn_clmm::clmm_router {
             fix_amount_a,
             tick_lower,
             tick_upper,
-            is_open,
+            open_new_position,
             index,
         )
     }
@@ -516,13 +525,13 @@ module dexlyn_clmm::clmm_router {
         fix_amount_a: bool,
         tick_lower: u64,
         tick_upper: u64,
-        is_open: bool,
+        open_new_position: bool,
         position_index: u64,
     ) {
         // Open position if needed.
         let tick_lower_index = i64::from_u64(tick_lower);
         let tick_upper_index = i64::from_u64(tick_upper);
-        let pos_index = if (is_open) {
+        let pos_index = if (open_new_position) {
             pool::open_position(
                 account,
                 pool_address,
@@ -530,17 +539,17 @@ module dexlyn_clmm::clmm_router {
                 tick_upper_index,
             )
         } else {
-            pool::check_position_authority(account, pool_address, position_index);
             let (position_tick_lower, position_tick_upper) =
                 pool::get_position_tick_range(pool_address, position_index);
-            assert!(i64::eq(tick_lower_index, position_tick_lower), EIS_NOT_VALID_TICK);
-            assert!(i64::eq(tick_upper_index, position_tick_upper), EIS_NOT_VALID_TICK);
+            assert!(i64::eq(tick_lower_index, position_tick_lower), EIS_NOT_VALID_LOWER_TICK);
+            assert!(i64::eq(tick_upper_index, position_tick_upper), EIS_NOT_VALID_UPPER_TICK);
             position_index
         };
 
         // Add liquidity
         let amount = if (fix_amount_a) { amount_a } else { amount_b };
-        let receipt = pool::add_liquidity_fix_asset(
+        let receipt = pool::add_liquidity_fix_asset_v2(
+            account,
             pool_address,
             amount,
             fix_amount_a,
@@ -548,9 +557,9 @@ module dexlyn_clmm::clmm_router {
         );
         let (amount_a_needed, amount_b_needed) = pool::add_liqudity_pay_amount(&receipt);
         if (fix_amount_a) {
-            assert!(amount_a == amount_a_needed && amount_b_needed <= amount_b, EAMOUNT_IN_ABOVE_MAX_LIMIT);
+            assert!(amount_a == amount_a_needed && amount_b_needed <= amount_b, EAMOUNT_A_ABOVE_MAX_LIMIT);
         }else {
-            assert!(amount_b == amount_b_needed && amount_a_needed <= amount_a, EAMOUNT_IN_ABOVE_MAX_LIMIT);
+            assert!(amount_b == amount_b_needed && amount_a_needed <= amount_a, EAMOUNT_B_ABOVE_MAX_LIMIT);
         };
 
         let (asset_a_addr, asset_b_addr) = pool::get_pool_assets(pool_address);
@@ -596,8 +605,8 @@ module dexlyn_clmm::clmm_router {
             delta_liquidity,
             position_index
         );
-        assert!(fungible_asset::amount(&asset_a) >= min_amount_a, EAMOUNT_OUT_BELOW_MIN_LIMIT);
-        assert!(fungible_asset::amount(&asset_b) >= min_amount_b, EAMOUNT_OUT_BELOW_MIN_LIMIT);
+        assert!(fungible_asset::amount(&asset_a) >= min_amount_a, EAMOUNT_OUT_A_BELOW_MIN_LIMIT);
+        assert!(fungible_asset::amount(&asset_b) >= min_amount_b, EAMOUNT_OUT_B_BELOW_MIN_LIMIT);
         let user_address = signer::address_of(account);
         primary_fungible_store::deposit(user_address, asset_a);
         primary_fungible_store::deposit(user_address, asset_b);
@@ -785,6 +794,16 @@ module dexlyn_clmm::clmm_router {
         sqrt_price_limit: u128,
         partner: String,
     ) {
+        let adjusted_sqrt_price_limit = if (sqrt_price_limit == 0) {
+            if (a_to_b) {
+                tick_math::min_sqrt_price() + 1
+            } else {
+                tick_math::max_sqrt_price() - 1
+            }
+        } else {
+            sqrt_price_limit
+        };
+
         let swap_from = signer::address_of(account);
         let (asset_a, asset_b, flash_receipt) = pool::flash_swap(
             pool_address,
@@ -793,7 +812,7 @@ module dexlyn_clmm::clmm_router {
             a_to_b,
             by_amount_in,
             amount,
-            sqrt_price_limit,
+            adjusted_sqrt_price_limit,
         );
         let in_amount = pool::swap_pay_amount(&flash_receipt);
         let out_amount = if (a_to_b) {
@@ -804,10 +823,10 @@ module dexlyn_clmm::clmm_router {
 
         //check limit
         if (by_amount_in) {
-            assert!(in_amount == amount, ESWAP_AMOUNT_INCORRECT);
+            assert!(in_amount == amount, ESWAP_IN_AMOUNT_INCORRECT);
             assert!(out_amount >= amount_limit, EAMOUNT_OUT_BELOW_MIN_LIMIT);
         }else {
-            assert!(out_amount == amount, ESWAP_AMOUNT_INCORRECT);
+            assert!(out_amount == amount, ESWAP_OUT_AMOUNT_INCORRECT);
             assert!(in_amount <= amount_limit, EAMOUNT_IN_ABOVE_MAX_LIMIT)
         };
 
@@ -861,6 +880,23 @@ module dexlyn_clmm::clmm_router {
         pool::initialize_rewarder(account, pool_address, authority, rewarder_index, asset_addr);
     }
 
+    /// Deposit reward assets to the rewarder at a given index in the pool.
+    /// Params
+    ///     - account: The deposit signer
+    ///     - pool_address: The pool account address
+    ///     - rewarder_index: The rewarder index
+    ///     - asset_addr: The reward asset address
+    ///     - amount: Amount to deposit
+    public entry fun deposit_reward(
+        account: &signer,
+        pool_address: address,
+        rewarder_index: u8,
+        asset_addr: address,
+        amount: u64
+    ) {
+        pool::deposit_reward(account, pool_address, rewarder_index, asset_addr, amount);
+    }
+
     /// Update the rewarder emission.
     /// Params
     ///     - pool_address
@@ -876,6 +912,21 @@ module dexlyn_clmm::clmm_router {
         asset_addr: address
     ) {
         pool::update_emission(account, pool_address, rewarder_index, emission_per_second, asset_addr);
+    }
+
+    /// Update the rewarder duration (admin only).
+    /// Params
+    ///     - pool_address
+    ///     - rewarder_index
+    ///     - duration_seconds: the duration in seconds for balance check
+    /// Returns
+    public entry fun update_rewarder_duration(
+        account: &signer,
+        pool_address: address,
+        rewarder_index: u8,
+        duration_seconds: u128
+    ) {
+        pool::update_rewarder_duration(account, pool_address, rewarder_index, duration_seconds);
     }
 
     /// Transfer the authority of a rewarder.
@@ -1009,14 +1060,23 @@ module dexlyn_clmm::clmm_router {
         config::init_clmm_acl(account)
     }
 
+
     /// Update the pool's position nft collection and token uri.
     /// Params
     ///     - account: The setter account signer
     ///     - pool_address: The pool address
     ///     - uri: The nft uri
+    ///     - start_index: The start index of the position nft
+    ///     - end_index: The end index of the position nft
     /// Returns
-    public entry fun update_pool_uri(account: &signer, pool_address: address, uri: String) {
-        pool::update_pool_uri(account, pool_address, uri)
+    public entry fun update_collection_and_nfts_uri(
+        account: &signer,
+        pool_address: address,
+        uri: String,
+        start_index: u64,
+        end_index: u64
+    ) {
+        pool::update_collection_and_nfts_uri(account, pool_address, uri, start_index, end_index)
     }
 
     /// Add role in clmm acl

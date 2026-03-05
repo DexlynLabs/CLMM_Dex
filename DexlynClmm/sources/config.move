@@ -20,17 +20,14 @@ module dexlyn_clmm::config {
     /// the signer is not authorized to perform the action
     const ENOT_HAS_PRIVILEGE: u64 = 1;
 
-    /// The global config is already initialized
-    const ECONFIG_ALREADY_INITIALIZED: u64 = 2;
-
     /// The protocol fee rate is set too high
-    const EINVALID_PROTOCOL_FEE_RATE: u64 = 3;
+    const EINVALID_PROTOCOL_FEE_RATE: u64 = 2;
 
     /// The protocol is paused and an action is attempted
-    const EPROTOCOL_IS_PAUSED: u64 = 4;
+    const EPROTOCOL_IS_PAUSED: u64 = 3;
 
     /// Invalid ACL role is provided
-    const EINVALID_ACL_ROLE: u64 = 5;
+    const EINVALID_ACL_ROLE: u64 = 4;
 
     /// Roles
     const ROLE_SET_POSITION_NFT_URI: u8 = 1;

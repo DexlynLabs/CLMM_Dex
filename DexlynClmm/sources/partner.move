@@ -26,26 +26,23 @@ module dexlyn_clmm::partner {
 
     /// Errors
 
-    /// The partner is already initialized
-    const EPARTNER_ALREADY_INITIALIZED: u64 = 1;
-
     /// The partner already existed
-    const EPARTNER_ALREADY_EXISTED: u64 = 2;
+    const EPARTNER_ALREADY_EXISTED: u64 = 1;
 
     /// The partner not existed
-    const EPARTNER_NOT_EXISTED: u64 = 3;
+    const EPARTNER_NOT_EXISTED: u64 = 2;
 
     /// The receiver is invalid
-    const EINVALID_RECEIVER: u64 = 4;
+    const EINVALID_RECEIVER: u64 = 3;
 
     /// The start_time and end_time is invalid
-    const EINVALID_TIME: u64 = 5;
+    const EINVALID_TIME: u64 = 4;
 
     /// The partner fee rate is invalid
-    const EINVALID_PARTNER_FEE_RATE: u64 = 6;
+    const EINVALID_PARTNER_FEE_RATE: u64 = 5;
 
     /// The partner name is invalid
-    const EINVALID_PARTNER_NAME: u64 = 7;
+    const EINVALID_PARTNER_NAME: u64 = 6;
 
     /// The Partners map
     struct Partners has key {

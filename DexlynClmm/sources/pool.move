@@ -6,6 +6,7 @@ module dexlyn_clmm::pool {
     use std::vector;
     use aptos_std::table::{Self, Table};
 
+    use aptos_token_objects::collection;
     use aptos_token_objects::token;
     use supra_framework::account;
     use supra_framework::event;
@@ -42,6 +43,9 @@ module dexlyn_clmm::pool {
     /// The denominator of protocol fee rate(rate=protocol_fee_rate/10000)
     const PROTOCOL_FEE_DENOMNINATOR: u64 = 10000;
 
+    /// The max range to update uri
+    const MAX_UPDATE_URI_RANGE: u64 = 1500;
+
     /// Royalty numerator and denominator 5%
     // const ROYALTY_NUMERATOR: u64 = 500;
     // const ROYALTY_DENOMNINATOR: u64 = 10000;
@@ -50,139 +54,129 @@ module dexlyn_clmm::pool {
     const REWARDER_NUM: u64 = 3;
 
     ///
-    const DAYS_IN_SECONDS: u128 = 24 * 60 * 60;
+    const MONTHS_IN_SECONDS: u128 = 30 * 24 * 60 * 60;
     const DEFAULT_ADDRESS: address = @0x0;
 
     const COLLECTION_DESCRIPTION: vector<u8> = b"Dexlyn Liquidity Position";
-    const POOL_DEFAULT_URI: vector<u8> = b"";
 
     /// Errors
 
     /// The tick is invalid
     const EINVALID_TICK: u64 = 1;
 
-    /// The pool is already initialized
-    const ETICK_ALREADY_INTIIALIZE: u64 = 2;
-
-    /// The tick spacing is zero
-    const ETICK_SPACING_IS_ZERO: u64 = 3;
-
-    /// reuired amount A exceeds the maximum allowed value
-    const EAMOUNT_IN_ABOVE_MAX_LIMIT: u64 = 4;
-
-    /// returned amount B is below the minimum limit
-    const EAMOUNT_OUT_BELOW_MIN_LIMIT: u64 = 5;
-
-    /// The amount in or out is incorrect
-    const EAMOUNT_INCORRECT: u64 = 6;
-
     /// The liquidity overflow
-    const ELIQUIDITY_OVERFLOW: u64 = 7;
+    const ELIQUIDITY_OVERFLOW: u64 = 2;
 
     /// The liquidity underflow
-    const ELIQUIDITY_UNDERFLOW: u64 = 8;
+    const ELIQUIDITY_UNDERFLOW: u64 = 3;
 
     /// The tick indexes are not set
-    const ETICK_INDEXES_NOT_SET: u64 = 9;
+    const ETICK_INDEXES_NOT_SET: u64 = 4;
 
     /// The tick not found
-    const ETICK_NOT_FOUND: u64 = 10;
+    const ETICK_NOT_FOUND: u64 = 5;
 
     /// The liquidity is zero
-    const ELIQUIDITY_IS_ZERO: u64 = 11;
+    const ELIQUIDITY_IS_ZERO: u64 = 6;
 
     /// Not enough liquidity in the pool to perform the swap
-    const ENOT_ENOUGH_LIQUIDITY: u64 = 12;
+    const ENOT_ENOUGH_LIQUIDITY: u64 = 7;
 
     // The remainer amount underflow
-    const EREMAINER_AMOUNT_UNDERFLOW: u64 = 13;
+    const EREMAINER_AMOUNT_UNDERFLOW: u64 = 8;
 
     /// The swap amount in or out overflow
-    const ESWAP_AMOUNT_IN_OVERFLOW: u64 = 14;
+    const ESWAP_AMOUNT_IN_OVERFLOW: u64 = 9;
 
     /// The swap amount out overflow
-    const ESWAP_AMOUNT_OUT_OVERFLOW: u64 = 15;
+    const ESWAP_AMOUNT_OUT_OVERFLOW: u64 = 10;
 
     /// The swap fee amount overflow
-    const ESWAP_FEE_AMOUNT_OVERFLOW: u64 = 16;
+    const ESWAP_FEE_AMOUNT_OVERFLOW: u64 = 11;
 
     /// The fee rate is incorrect
-    const EINVALID_FEE_RATE: u64 = 17;
-
-    /// The fixed token type is invalid
-    const EINVALID_FIXED_TOKEN_TYPE: u64 = 18;
+    const EINVALID_FEE_RATE: u64 = 12;
 
     /// The pool not exists
-    const EPOOL_NOT_EXISTS: u64 = 19;
-
-    /// The swap amount in is incorrect
-    const ESWAP_AMOUNT_INCORRECT: u64 = 20;
-
-    /// The partner is invalid
-    const EINVALID_PARTNER: u64 = 21;
+    const EPOOL_NOT_EXISTS: u64 = 13;
 
     /// The sqrt price is not in the range of tick spacing
-    const EWRONG_SQRT_PRICE_LIMIT: u64 = 22;
+    const EWRONG_SQRT_PRICE_LIMIT: u64 = 14;
 
     /// The reward index is invalid
-    const EINVALID_REWARD_INDEX: u64 = 23;
+    const EINVALID_REWARD_INDEX: u64 = 15;
 
     /// The reward amount is insufficient
-    const EREWARD_AMOUNT_INSUFFICIENT: u64 = 24;
+    const EREWARD_AMOUNT_INSUFFICIENT: u64 = 16;
 
     /// The reward not match with index
-    const EREWARD_NOT_MATCH_WITH_INDEX: u64 = 25;
+    const EREWARD_NOT_MATCH_WITH_INDEX: u64 = 17;
 
     /// The reward authority is not match with pool
-    const EREWARD_AUTH_ERROR: u64 = 26;
+    const EREWARD_AUTH_ERROR: u64 = 18;
 
     /// The time is invalid
-    const EINVALID_TIME: u64 = 27;
+    const EINVALID_TIME: u64 = 19;
 
     /// The position owner is not match with pool
-    const EPOSITION_OWNER_ERROR: u64 = 28;
+    const EPOSITION_OWNER_ERROR: u64 = 20;
 
     /// The position not exist
-    const EPOSITION_NOT_EXIST: u64 = 29;
+    const EPOSITION_NOT_EXIST: u64 = 21;
 
     /// The tick is not valid
-    const EIS_NOT_VALID_TICK: u64 = 30;
-
-    /// The pool address is not match with pool
-    const EPOOL_ADDRESS_ERROR: u64 = 31;
+    const EIS_NOT_VALID_TICK: u64 = 22;
 
     /// The pool is paused
-    const EPOOL_IS_PAUSED: u64 = 32;
+    const EPOOL_IS_PAUSED: u64 = 23;
 
     /// The pool liquidity is not zero, can not reset the init price
-    const EPOOL_LIQUIDITY_IS_NOT_ZERO: u64 = 33;
+    const EPOOL_LIQUIDITY_IS_NOT_ZERO: u64 = 24;
 
     /// The rewarder owned overflow
-    const EREWARDER_OWNED_OVERFLOW: u64 = 34;
+    const EREWARDER_OWNED_OVERFLOW: u64 = 25;
 
     /// The fee owned overflow
-    const EFEE_OWNED_OVERFLOW: u64 = 35;
+    const EFEE_OWNED_OVERFLOW: u64 = 26;
 
     /// The delta liquidity is invalid
-    const EINVALID_DELTA_LIQUIDITY: u64 = 36;
+    const EINVALID_DELTA_LIQUIDITY: u64 = 27;
 
     /// The asset type is same
-    const ESAME_ASSET_TYPE: u64 = 37;
+    const ESAME_ASSET_TYPE: u64 = 28;
 
     /// The sqrt price is invalid
-    const EINVALID_SQRT_PRICE: u64 = 38;
-
-    /// The function is disabled
-    const EFUNC_DISABLED: u64 = 39;
+    const EINVALID_SQRT_PRICE: u64 = 29;
 
     /// The account has no privilege to call this function
-    const ENOT_HAS_PRIVILEGE: u64 = 40;
+    const ENOT_HAS_PRIVILEGE: u64 = 30;
 
     /// The pool uri is invalid
-    const EINVALID_POOL_URI: u64 = 41;
+    const EINVALID_POOL_URI: u64 = 31;
 
     /// The asset type is different
-    const EDIFFERENT_ASSET_TYPE: u64 = 42;
+    const EDIFFERENT_ASSET_TYPE: u64 = 32;
+
+    /// The fix amount params is invalid
+    const EINVALID_FIX_AMOUNT_PARAMS: u64 = 33;
+
+    /// The amount A is incorrect
+    const EAMOUNT_A_INCORRECT: u64 = 34;
+
+    /// The amount B is incorrect
+    const EAMOUNT_B_INCORRECT: u64 = 35;
+
+    /// The amount is zero
+    const EAMOUNT_IS_ZERO: u64 = 36;
+
+    /// The reward is not enough in the pool
+    const ENOT_ENOUGH_REWARD: u64 = 37;
+
+    /// The index range is invalid
+    const EINVALID_INDEX_RANGE: u64 = 38;
+
+    /// Disabled function
+    const EFUN_DISABLED: u64 = 39;
 
     /// The clmmpool metadata info
     struct Pool has key {
@@ -253,6 +247,64 @@ module dexlyn_clmm::pool {
 
     }
 
+    /// Pool Details
+    struct PoolDetails has drop {
+        /// Pool index
+        index: u64,
+
+        /// Pool address
+        pool_address: address,
+
+        /// pool position token collection name
+        collection_name: String,
+
+        /// The pool asset A type
+        asset_a: u64,
+
+        /// The pool asset B type
+        asset_b: u64,
+
+        /// The tick spacing
+        tick_spacing: u64,
+
+        /// The numerator of fee rate, the denominator is 1_000_000.
+        fee_rate: u64,
+
+        /// The liquidity of current tick index
+        liquidity: u128,
+
+        /// The current sqrt price
+        current_sqrt_price: u128,
+
+        /// The current tick index
+        current_tick_index: I64,
+
+        /// The global fee growth of asset a as Q64.64
+        fee_growth_global_a: u128,
+        /// The global fee growth of asset b as Q64.64
+        fee_growth_global_b: u128,
+
+        /// The amounts of asset a owed to protocol
+        fee_protocol_asset_a: u64,
+        /// The amounts of asset b owed to protocol
+        fee_protocol_asset_b: u64,
+
+        /// Position Count
+        position_count: u64,
+
+        /// is the pool paused
+        is_pause: bool,
+
+        /// The position nft uri.
+        uri: String,
+
+        /// FungibleAsset A object address
+        asset_a_addr: address,
+
+        /// FungibleAsset B object address
+        asset_b_addr: address,
+    }
+
     /// The clmmpool's tick item
     struct Tick has copy, drop, store {
         index: I64,
@@ -285,6 +337,8 @@ module dexlyn_clmm::pool {
         pending_authority: address,
         emissions_per_second: u128,
         growth_global: u128,
+        balance: u64,
+        duration_seconds: u128,
     }
 
     /// The PositionRewarder for record position's additional liquidity incentives.
@@ -455,6 +509,15 @@ module dexlyn_clmm::pool {
     }
 
     #[event]
+    struct DepositRewardEvent has drop, store {
+        pool_address: address,
+        depositor: address,
+        rewarder_index: u8,
+        amount: u64,
+        timestamp: u64,
+    }
+
+    #[event]
     struct TransferRewardAuthEvent has drop, store {
         pool_address: address,
         rewarder_index: u8,
@@ -472,12 +535,22 @@ module dexlyn_clmm::pool {
     }
 
     #[event]
+    struct UpdateRewarderDurationEvent has drop, store {
+        pool_address: address,
+        rewarder_index: u8,
+        duration_seconds: u128,
+        timestamp: u64,
+    }
+
+    #[event]
     struct CollectRewardEvent has drop, store {
         position_index: u64,
         user: address,
         pool_address: address,
         amount: u64,
         rewarder_index: u8,
+        rewards_paid_out: u64,
+        rewards_remaining: u64,
         timestamp: u64,
     }
 
@@ -576,15 +649,7 @@ module dexlyn_clmm::pool {
     ///     - new_initialize_price The pool's new initialize sqrt price
     /// return
     ///     - None
-    public fun reset_init_price(_pool_address: address, _new_initialize_price: u128) {
-        abort EFUNC_DISABLED
-        //let pool = borrow_global_mut<Pool>(pool_address);
-        //assert!(pool.position_index == 1, EPOOL_LIQUIDITY_IS_NOT_ZERO);
-        //pool.current_sqrt_price = new_initialize_price;
-        //pool.current_tick_index = tick_math::get_tick_at_sqrt_price(new_initialize_price);
-    }
-
-    public fun reset_init_price_v2(
+    public fun reset_init_price(
         account: &signer,
         pool_address: address,
         new_initialize_price: u128
@@ -705,7 +770,7 @@ module dexlyn_clmm::pool {
             pool_info.collection_name,
             i64::as_u64(tick_lower_index),
             i64::as_u64(tick_upper_index),
-            pool_info.liquidity,
+            0,
             pool_info.asset_a_addr,
             pool_info.asset_b_addr,
             option::none()
@@ -726,21 +791,32 @@ module dexlyn_clmm::pool {
         position_index
     }
 
+    public fun add_liquidity(
+        _pool_address: address,
+        _liquidity: u128,
+        _position_index: u64
+    ): AddLiquidityReceipt {
+        abort EFUN_DISABLED
+    }
+
     /// Add liquidity on a position by liquidity amount.
     /// anyone can add liquidity on any position, please check the ownership of the position befor call it.
     /// params
+    ///     account The position owner
     ///     pool_address The pool account address
     ///     liqudity The delta liqudity amount
     ///     position_index The position index
     /// return
     ///     receipt The add liquidity receipt(hot-potato)
-    public fun add_liquidity(
+    public fun add_liquidity_v2(
+        account: &signer,
         pool_address: address,
         liquidity: u128,
         position_index: u64
     ): AddLiquidityReceipt acquires Pool {
         assert!(liquidity != 0, ELIQUIDITY_IS_ZERO);
         add_liquidity_internal(
+            account,
             pool_address,
             position_index,
             false,
@@ -750,23 +826,35 @@ module dexlyn_clmm::pool {
         )
     }
 
+    public fun add_liquidity_fix_asset(
+        _pool_address: address,
+        _amount: u64,
+        _fix_amount_a: bool,
+        _position_index: u64
+    ): AddLiquidityReceipt {
+        abort EFUN_DISABLED
+    }
+
     /// Add liquidity on a position by asset amount.
     /// anyone can add liquidity on any position, please check the ownership of the position befor call it.
     /// params
+    ///     account The position owner
     ///     pool_address The pool account address
     ///     amount The asset amount
     ///     fix_amount_a If true the amount is asset_a else is asset_b
     ///     position_index The position index
     /// return
     ///     receipt The add liquidity receipt(hot-potato)
-    public fun add_liquidity_fix_asset(
+    public fun add_liquidity_fix_asset_v2(
+        account: &signer,
         pool_address: address,
         amount: u64,
         fix_amount_a: bool,
         position_index: u64
     ): AddLiquidityReceipt acquires Pool {
-        assert!(amount > 0, EAMOUNT_INCORRECT);
+        assert!(amount > 0, EAMOUNT_IS_ZERO);
         add_liquidity_internal(
+            account,
             pool_address,
             position_index,
             true,
@@ -791,9 +879,16 @@ module dexlyn_clmm::pool {
             amount_a,
             amount_b
         } = receipt;
-        assert!(fungible_asset::amount(&asset_a) == amount_a, EAMOUNT_INCORRECT);
-        assert!(fungible_asset::amount(&asset_b) == amount_b, EAMOUNT_INCORRECT);
+        assert!(fungible_asset::amount(&asset_a) == amount_a, EAMOUNT_A_INCORRECT);
+        assert!(fungible_asset::amount(&asset_b) == amount_b, EAMOUNT_B_INCORRECT);
         let pool = borrow_global_mut<Pool>(pool_address);
+
+        // Validate asset types match pool configuration
+        let asset_a_metadata = fungible_asset::metadata_from_asset(&asset_a);
+        let asset_b_metadata = fungible_asset::metadata_from_asset(&asset_b);
+        assert!(object::object_address(&asset_a_metadata) == pool.asset_a_addr, EDIFFERENT_ASSET_TYPE);
+        assert!(object::object_address(&asset_b_metadata) == pool.asset_b_addr, EDIFFERENT_ASSET_TYPE);
+
         // Merge asset
         primary_fungible_store::deposit(pool_address, asset_a);
         primary_fungible_store::deposit(pool_address, asset_b);
@@ -819,7 +914,7 @@ module dexlyn_clmm::pool {
         check_position_authority(account, pool_address, position_index);
 
         let pool = borrow_global_mut<Pool>(pool_address);
-        //assert_status(pool);
+        assert_status(pool);
         update_rewarder(pool);
 
         // 1. Update position's fee and rewarder
@@ -934,7 +1029,7 @@ module dexlyn_clmm::pool {
     ): bool acquires Pool {
         check_position_authority(account, pool_address, position_index);
         let pool = borrow_global_mut<Pool>(pool_address);
-        //assert_status(pool);
+        assert_status(pool);
         let position = table::borrow(&pool.positions, position_index);
 
         // 1. Check position liquidity is zero.
@@ -996,7 +1091,7 @@ module dexlyn_clmm::pool {
     ): (FungibleAsset, FungibleAsset) acquires Pool {
         check_position_authority(account, pool_address, position_index);
         let pool = borrow_global_mut<Pool>(pool_address);
-        //assert_status(pool);
+        assert_status(pool);
 
         let position = if (recalculate) {
             let (tick_lower, tick_upper) = get_position_tick_range_by_pool(
@@ -1072,8 +1167,13 @@ module dexlyn_clmm::pool {
         check_position_authority(account, pool_address, position_index);
 
         let pool = borrow_global_mut<Pool>(pool_address);
-        //assert_status(pool);
+        assert_status(pool);
         update_rewarder(pool);
+
+        assert!((rewarder_index as u64) < vector::length(&pool.rewarder_infos), EINVALID_REWARD_INDEX);
+        let rewarder = vector::borrow(&pool.rewarder_infos, (rewarder_index as u64));
+        assert!(rewarder.asset_address == asset_addr, EREWARD_NOT_MATCH_WITH_INDEX);
+        assert!(rewarder.balance != 0, ENOT_ENOUGH_REWARD);
 
         let position = if (recalculate) {
             let (tick_lower, tick_upper) = get_position_tick_range_by_pool(
@@ -1088,21 +1188,32 @@ module dexlyn_clmm::pool {
             table::borrow_mut(&mut pool.positions, position_index)
         };
 
-        // Get rewarder asset and reset owed rewarder.
         let pool_signer = account::create_signer_with_capability(&pool.signer_cap);
         let amount = &mut vector::borrow_mut(&mut position.rewarder_infos, (rewarder_index as u64)).amount_owed;
         let asset_metadata = object::address_to_object<Metadata>(asset_addr);
+
+        let rewarder_mut = vector::borrow_mut(&mut pool.rewarder_infos, (rewarder_index as u64));
+        let rewards_paid_out = if (*amount > rewarder_mut.balance) {
+            rewarder_mut.balance
+        } else {
+            *amount
+        };
+
         let rewarder_asset = primary_fungible_store::withdraw(
             &pool_signer,
             asset_metadata,
-            *amount
+            rewards_paid_out
         );
-        *amount = 0;
+
+        rewarder_mut.balance = rewarder_mut.balance - rewards_paid_out;
+        *amount = *amount - rewards_paid_out;
 
         event::emit(CollectRewardEvent {
             pool_address,
             user: signer::address_of(account),
             amount: fungible_asset::amount(&rewarder_asset),
+            rewards_paid_out,
+            rewards_remaining: *amount,
             position_index: position_index,
             rewarder_index: rewarder_index,
             timestamp: timestamp::now_seconds(),
@@ -1116,20 +1227,39 @@ module dexlyn_clmm::pool {
     ///     - account The setter
     ///     - pool_address The pool address
     ///     - uri The new uri
+    ///     - start_index: starting index of positions
+    ///     - end_index: end index of positions
     /// Returns:
     ///     None
-    public fun update_pool_uri(
+    public fun update_collection_and_nfts_uri(
         account: &signer,
         pool_address: address,
-        uri: String
-    ) acquires Pool {
+        uri: String,
+        start_index: u64,
+        end_index: u64
+    ) acquires Pool
+    {
         assert!(!string::is_empty(&uri), EINVALID_POOL_URI);
         assert!(config::allow_set_position_nft_uri(account), ENOT_HAS_PRIVILEGE);
+        assert!(start_index <= end_index, EINVALID_INDEX_RANGE);
+        assert!((end_index - start_index) < MAX_UPDATE_URI_RANGE, EINVALID_INDEX_RANGE);
         let pool = borrow_global_mut<Pool>(pool_address);
-        let pool_signer = account::create_signer_with_capability(&pool.signer_cap);
-        position_nft::mutate_collection_uri(&pool_signer, pool.collection_name, uri);
+        let collection_addr = collection::create_collection_address(&pool_address, &pool.collection_name);
+
+        let token_indexes = vector::empty<u64>();
+
+        let i = start_index;
+        while (i <= end_index) {
+            if (table::contains(&pool.positions, i)) {
+                vector::push_back(&mut token_indexes, i);
+            };
+            i = i + 1;
+        };
         pool.uri = uri;
+        let token_addresses = generate_token_addresses(pool_address, token_indexes);
+        position_nft::update_uri(collection_addr, token_addresses, uri);
     }
+
 
     /// Swap output asset and flash loan resource.
     /// Params
@@ -1251,8 +1381,15 @@ module dexlyn_clmm::pool {
             ref_fee_amount
         } = receipt;
         let pool = borrow_global_mut<Pool>(pool_address);
+
+        // Validate asset types match pool configuration
+        let asset_a_metadata = fungible_asset::metadata_from_asset(&asset_a);
+        let asset_b_metadata = fungible_asset::metadata_from_asset(&asset_b);
+        assert!(object::object_address(&asset_a_metadata) == pool.asset_a_addr, EDIFFERENT_ASSET_TYPE);
+        assert!(object::object_address(&asset_b_metadata) == pool.asset_b_addr, EDIFFERENT_ASSET_TYPE);
+
         if (a2b) {
-            assert!(fungible_asset::amount(&asset_a) == pay_amount, EAMOUNT_INCORRECT);
+            assert!(fungible_asset::amount(&asset_a) == pay_amount, EAMOUNT_A_INCORRECT);
             // send ref fee to partner
             if (ref_fee_amount > 0) {
                 let ref_fee = fungible_asset::extract(&mut asset_a, ref_fee_amount);
@@ -1262,7 +1399,7 @@ module dexlyn_clmm::pool {
             fungible_asset::destroy_zero(asset_b);
             pool.asset_a = pool.asset_a + pay_amount - ref_fee_amount;
         } else {
-            assert!(fungible_asset::amount(&asset_b) == pay_amount, EAMOUNT_INCORRECT);
+            assert!(fungible_asset::amount(&asset_b) == pay_amount, EAMOUNT_B_INCORRECT);
             // send ref fee to partner
             if (ref_fee_amount > 0) {
                 let ref_fee = fungible_asset::extract(&mut asset_b, ref_fee_amount);
@@ -1286,7 +1423,7 @@ module dexlyn_clmm::pool {
         config::assert_protocol_fee_claim_authority(account);
 
         let pool_info = borrow_global_mut<Pool>(pool_address);
-        //assert_status(pool_info);
+        assert_status(pool_info);
         let amount_a = pool_info.fee_protocol_asset_a;
         let amount_b = pool_info.fee_protocol_asset_b;
         let pool_signer = account::create_signer_with_capability(&pool_info.signer_cap);
@@ -1341,9 +1478,49 @@ module dexlyn_clmm::pool {
             pending_authority: DEFAULT_ADDRESS,
             emissions_per_second: 0,
             growth_global: 0,
+            balance: 0,
+            duration_seconds: MONTHS_IN_SECONDS,
         };
         primary_fungible_store::ensure_primary_store_exists(pool_address, rewarder_metadata);
         vector::push_back(rewarder_infos, rewarder);
+    }
+
+    /// Deposit reward tokens into a rewarder
+    /// Params
+    ///     - account The account depositing the reward tokens
+    ///     - pool_address The address of pool
+    ///     - rewarder_index: rewarder index
+    ///     - rewarder_addr: The address of reward asset
+    ///     - amount: The amount to deposit as rewards
+    public fun deposit_reward(
+        account: &signer,
+        pool_address: address,
+        rewarder_index: u8,
+        rewarder_addr: address,
+        amount: u64
+    ) acquires Pool {
+        check_pool_exists(pool_address);
+        let pool = borrow_global_mut<Pool>(pool_address);
+        assert_status(pool);
+        assert!((rewarder_index as u64) < vector::length(&pool.rewarder_infos), EINVALID_REWARD_INDEX);
+
+        let rewarder = vector::borrow_mut(&mut pool.rewarder_infos, (rewarder_index as u64));
+        assert!(rewarder_addr == rewarder.asset_address, EDIFFERENT_ASSET_TYPE);
+        let reward_asset = primary_fungible_store::withdraw(
+            account,
+            object::address_to_object<Metadata>(rewarder_addr),
+            amount
+        );
+        primary_fungible_store::deposit(pool_address, reward_asset);
+        rewarder.balance = rewarder.balance + amount;
+
+        event::emit(DepositRewardEvent {
+            pool_address,
+            depositor: signer::address_of(account),
+            rewarder_index,
+            amount,
+            timestamp: timestamp::now_seconds(),
+        });
     }
 
     /// Update the rewarder emission speed to start the rewarder to generate.
@@ -1352,6 +1529,7 @@ module dexlyn_clmm::pool {
     ///     - pool_address The address of pool
     ///     - index: rewarder index.
     ///     - emissions_per_second: the asset number generated every second represented by X64.
+    ///     - asset_addr: the asset address
     /// Return
     ///     null
     public fun update_emission(
@@ -1359,21 +1537,21 @@ module dexlyn_clmm::pool {
         pool_address: address,
         rewarder_index: u8,
         emissions_per_second: u128,
-        asset_addr: address
+        asset_addr: address,
     ) acquires Pool {
         let pool = borrow_global_mut<Pool>(pool_address);
         assert_status(pool);
         update_rewarder(pool);
 
-        let emission_per_day = full_math_u128::mul_shr(DAYS_IN_SECONDS, emissions_per_second, 64);
         assert!((rewarder_index as u64) < vector::length(&pool.rewarder_infos), EINVALID_REWARD_INDEX);
         let rewarder = vector::borrow_mut(&mut pool.rewarder_infos, (rewarder_index as u64));
         let account_addr = signer::address_of(account);
         assert!(account_addr == rewarder.authority, EREWARD_AUTH_ERROR);
         assert!(rewarder.asset_address == asset_addr, EREWARD_NOT_MATCH_WITH_INDEX);
-        let asset_metadata = object::address_to_object<Metadata>(rewarder.asset_address);
+
+        let emission_for_duration = full_math_u128::mul_shr(rewarder.duration_seconds, emissions_per_second, 64);
         assert!(
-            primary_fungible_store::balance(pool_address, asset_metadata) >= (emission_per_day as u64),
+            rewarder.balance >= (emission_for_duration as u64),
             EREWARD_AMOUNT_INSUFFICIENT
         );
         rewarder.emissions_per_second = emissions_per_second;
@@ -1440,6 +1618,37 @@ module dexlyn_clmm::pool {
             pool_address,
             rewarder_index,
             authority: new_authority,
+            timestamp: timestamp::now_seconds(),
+        })
+    }
+
+    /// Update the rewarder duration (admin only).
+    /// Params
+    ///     - account: The protocol admin
+    ///     - pool_address: The address of pool
+    ///     - rewarder_index: rewarder index
+    ///     - duration_seconds: the duration in seconds for balance check
+    /// Return
+    ///     null
+    public fun update_rewarder_duration(
+        account: &signer,
+        pool_address: address,
+        rewarder_index: u8,
+        duration_seconds: u128
+    ) acquires Pool {
+        config::assert_protocol_authority(account);
+        let pool = borrow_global_mut<Pool>(pool_address);
+        assert_status(pool);
+        update_rewarder(pool);
+
+        assert!((rewarder_index as u64) < vector::length(&pool.rewarder_infos), EINVALID_REWARD_INDEX);
+        let rewarder_mut = vector::borrow_mut(&mut pool.rewarder_infos, (rewarder_index as u64));
+
+        rewarder_mut.duration_seconds = duration_seconds;
+        event::emit(UpdateRewarderDurationEvent {
+            pool_address,
+            rewarder_index,
+            duration_seconds,
             timestamp: timestamp::now_seconds(),
         })
     }
@@ -1810,15 +2019,10 @@ module dexlyn_clmm::pool {
         let token_addresses = vector::empty<address>();
 
         vector::for_each(position_ids, |pos_ids|{
-            let collection_name = position_nft::collection_name(
-                pool.tick_spacing,
-                pool.asset_a_addr,
-                pool.asset_b_addr
-            );
             let token_name = position_nft::position_name(pool.index, pos_ids);
             let token_address = token::create_token_address(
                 &pool_address,
-                &collection_name,
+                &pool.collection_name,
                 &token_name
             );
             vector::push_back(&mut token_addresses, token_address);
@@ -1830,7 +2034,8 @@ module dexlyn_clmm::pool {
     public fun swap_routing(
         pool_addresses: vector<address>,
         a2b: bool,
-        by_amount_in: bool,
+        fix_amount_in: bool,
+        fix_amount_out: bool,
         amount: u64
     ): (address, CalculatedSwapResult) acquires Pool {
         let (fa_a, fa_b) = get_pool_assets(*vector::borrow(&pool_addresses, 0));
@@ -1842,21 +2047,274 @@ module dexlyn_clmm::pool {
 
         let best_pool_address = @0x0;
         let best_amount_out = 0;
+        let best_total_cost = 0;
+        let total_cost = 0;
         let best_swap_result = CalculatedSwapResult {
             amount_out: 0, amount_in: 0, fee_amount: 0, fee_rate: 0, after_sqrt_price: 0, is_exceed: false, step_results: vector::empty(
             )
         };
+        let result = CalculatedSwapResult {
+            amount_out: 0, amount_in: 0, fee_amount: 0, fee_rate: 0, after_sqrt_price: 0, is_exceed: false, step_results: vector::empty(
+            )
+        };
 
-        vector::for_each(pool_addresses, |pool_address| {
-            let result = calculate_swap_result(pool_address, a2b, by_amount_in, amount);
-            if (result.amount_out > best_amount_out) {
-                best_amount_out = result.amount_out;
-                best_pool_address = pool_address;
-                best_swap_result = result;
-            };
-        });
+        if (fix_amount_in) {
+            assert!(!fix_amount_out, EINVALID_FIX_AMOUNT_PARAMS);
+            vector::for_each(pool_addresses, |pool_address| {
+                result = calculate_swap_result(pool_address, a2b, true, amount);
+
+                if (!result.is_exceed) {
+                    if (result.amount_out > best_amount_out) {
+                        best_amount_out = result.amount_out;
+                        best_pool_address = pool_address;
+                        best_swap_result = result;
+                    };
+                };
+            });
+            (best_pool_address, best_swap_result);
+        } else if (fix_amount_out) {
+            assert!(!fix_amount_in, EINVALID_FIX_AMOUNT_PARAMS);
+            vector::for_each(pool_addresses, |pool_address| {
+                result = calculate_swap_result(pool_address, a2b, false, amount);
+                total_cost = result.amount_in + result.fee_amount;
+
+                if (!result.is_exceed) {
+                    if (best_total_cost == 0 || total_cost < best_total_cost) {
+                        best_total_cost = total_cost;
+                        best_pool_address = pool_address;
+                        best_swap_result = result;
+                    };
+                };
+            });
+            (best_pool_address, best_swap_result);
+        } else {
+            vector::for_each(pool_addresses, |pool_address| {
+                result = calculate_swap_result(pool_address, a2b, true, amount);
+                total_cost = result.amount_in + result.fee_amount;
+
+                if (result.amount_out > best_amount_out ||
+                    (result.amount_out == best_amount_out && total_cost < best_total_cost)) {
+                    best_amount_out = result.amount_out;
+                    best_total_cost = total_cost;
+                    best_pool_address = pool_address;
+                    best_swap_result = result;
+                };
+            });
+        };
         (best_pool_address, best_swap_result)
     }
+
+    #[view]
+    public fun calculate_all_pools_swap_results(
+        pool_addresses: vector<address>,
+        a2b: bool,
+        by_amount_in: bool,
+        amount: u64
+    ): vector<CalculatedSwapResult> acquires Pool {
+        let results = vector::empty<CalculatedSwapResult>();
+        vector::for_each(pool_addresses, |pool_address| {
+            if (exists<Pool>(pool_address)) {
+                let result = calculate_swap_result(pool_address, a2b, by_amount_in, amount);
+                vector::push_back(&mut results, result);
+            }
+        });
+        results
+    }
+
+    #[view]
+    public fun get_pool_details(
+        pool_addresses: vector<address>
+    ): vector<Option<PoolDetails>> acquires Pool {
+        let results = vector::empty<Option<PoolDetails>>();
+        if (vector::is_empty(&pool_addresses)) {
+            return results
+        };
+        vector::for_each(pool_addresses, |addr| {
+            if (exists<Pool>(addr)) {
+                let pool = borrow_global<Pool>(addr);
+                vector::push_back(&mut results, option::some(PoolDetails {
+                    index: pool.index,
+                    pool_address: addr,
+                    collection_name: pool.collection_name,
+                    asset_a: pool.asset_a,
+                    asset_b: pool.asset_b,
+                    tick_spacing: pool.tick_spacing,
+                    fee_rate: pool.fee_rate,
+                    liquidity: pool.liquidity,
+                    current_sqrt_price: pool.current_sqrt_price,
+                    current_tick_index: pool.current_tick_index,
+                    fee_growth_global_a: pool.fee_growth_global_a,
+                    fee_growth_global_b: pool.fee_growth_global_b,
+                    fee_protocol_asset_a: pool.fee_protocol_asset_a,
+                    fee_protocol_asset_b: pool.fee_protocol_asset_b,
+                    position_count: pool.position_index,
+                    is_pause: pool.is_pause,
+                    uri: pool.uri,
+                    asset_a_addr: pool.asset_a_addr,
+                    asset_b_addr: pool.asset_b_addr,
+                }));
+            } else {
+                vector::push_back(&mut results, option::none<PoolDetails>());
+            }
+        });
+        results
+    }
+
+
+    /// Destructure PoolDetails into its individual fields.
+    /// details - Reference to PoolDetails.
+    /// Returns a tuple of all fields in PoolDetails.
+    public fun destructure_pool_details(details: &PoolDetails): (
+        u64, address, String, u64, u64, u64, u64, u128, u128, I64, u128, u128, u64, u64, u64, bool, String, address, address
+    ) {
+        (
+            details.index,
+            details.pool_address,
+            details.collection_name,
+            details.asset_a,
+            details.asset_b,
+            details.tick_spacing,
+            details.fee_rate,
+            details.liquidity,
+            details.current_sqrt_price,
+            details.current_tick_index,
+            details.fee_growth_global_a,
+            details.fee_growth_global_b,
+            details.fee_protocol_asset_a,
+            details.fee_protocol_asset_b,
+            details.position_count,
+            details.is_pause,
+            details.uri,
+            details.asset_a_addr,
+            details.asset_b_addr
+        )
+    }
+
+    /// Destructure Tick into its individual fields.
+    /// tick - Reference to Tick.
+    /// Returns a tuple of all fields in Tick.
+    public fun destructure_tick(tick: &Tick): (
+        I64, u128, I128, u128, u128, u128, vector<u128>
+    ) {
+        (
+            tick.index,
+            tick.sqrt_price,
+            tick.liquidity_net,
+            tick.liquidity_gross,
+            tick.fee_growth_outside_a,
+            tick.fee_growth_outside_b,
+            tick.rewarders_growth_outside
+        )
+    }
+
+    /// Destructure Position into its individual fields.
+    /// pos - Reference to Position.
+    /// Returns a tuple of all fields in Position.
+    public fun destructure_position(pos: &Position): (
+        address, u64, u128, I64, I64, u128, u64, u128, u64, vector<PositionRewarder>
+    ) {
+        (
+            pos.pool,
+            pos.index,
+            pos.liquidity,
+            pos.tick_lower_index,
+            pos.tick_upper_index,
+            pos.fee_growth_inside_a,
+            pos.fee_owed_a,
+            pos.fee_growth_inside_b,
+            pos.fee_owed_b,
+            pos.rewarder_infos
+        )
+    }
+
+    /// Destructure PositionRewarder into its individual fields.
+    /// rewarder - Reference to PositionRewarder.
+    /// Returns a tuple of all fields in PositionRewarder.
+    public fun destructure_position_rewarder(rewarder: &PositionRewarder): (
+        u128, u64
+    ) {
+        (
+            rewarder.growth_inside,
+            rewarder.amount_owed
+        )
+    }
+
+    /// Destructure FlashSwapReceipt into its individual fields.
+    /// receipt - Reference to FlashSwapReceipt.
+    /// Returns a tuple of all fields in FlashSwapReceipt.
+    public fun destructure_flash_swap_receipt(receipt: &FlashSwapReceipt): (
+        address, bool, String, u64, u64
+    ) {
+        (
+            receipt.pool_address,
+            receipt.a2b,
+            receipt.partner_name,
+            receipt.pay_amount,
+            receipt.ref_fee_amount
+        )
+    }
+
+    /// Destructure AddLiquidityReceipt into its individual fields.
+    /// receipt - Reference to AddLiquidityReceipt.
+    /// Returns a tuple of all fields in AddLiquidityReceipt. 
+    public fun destructure_add_liquidity_receipt(receipt: &AddLiquidityReceipt): (
+        address, u64, u64
+    ) {
+        (
+            receipt.pool_address,
+            receipt.amount_a,
+            receipt.amount_b
+        )
+    }
+
+    /// Destructure CalculatedSwapResult into its individual fields.
+    /// result - Reference to CalculatedSwapResult.
+    /// Returns a tuple of all fields in CalculatedSwapResult.
+    public fun destructure_calculated_swap_result(result: &CalculatedSwapResult): (
+        u64, u64, u64, u64, u128, bool, vector<SwapStepResult>
+    ) {
+        (
+            result.amount_in,
+            result.amount_out,
+            result.fee_amount,
+            result.fee_rate,
+            result.after_sqrt_price,
+            result.is_exceed,
+            result.step_results
+        )
+    }
+
+    /// Destructure SwapStepResult into its individual fields.
+    /// step - Reference to SwapStepResult.
+    /// Returns a tuple of all fields in SwapStepResult.
+    public fun destructure_swap_step_result(step: &SwapStepResult): (
+        u128, u128, u128, u64, u64, u64, u64
+    ) {
+        (
+            step.current_sqrt_price,
+            step.target_sqrt_price,
+            step.current_liquidity,
+            step.amount_in,
+            step.amount_out,
+            step.fee_amount,
+            step.remainer_amount
+        )
+    }
+
+    /// Destructure PositionReward into its individual fields.
+    /// reward - Reference to PositionReward.
+    /// Returns a tuple of all fields in PositionReward.
+    public fun destructure_position_reward(reward: &PositionReward): (
+        address, u64, u64, u64
+    ) {
+        (
+            reward.pool_address,
+            reward.position_id,
+            reward.fee_a,
+            reward.fee_b
+        )
+    }
+
 
     // PRIVATE FUNCTIONS
     //============================================================================================================
@@ -1899,8 +2357,6 @@ module dexlyn_clmm::pool {
     /// Get the max tick indexes index
     fun tick_indexes_max(tick_spacing: u64): u64 {
         ((tick_math::tick_bound() * 2) / (tick_spacing * TICK_INDEXES_LENGTH)) + 1
-        //let max_tick = tick_max(tick_spacing);
-        //tick_indexes_index(max_tick, tick_spacing)
     }
 
     // Get the min bound of tick with tick spacing
@@ -1961,6 +2417,7 @@ module dexlyn_clmm::pool {
 
     // Add liquidity in pool
     fun add_liquidity_internal(
+        account: &signer,
         pool_address: address,
         position_index: u64,
         by_amount: bool,
@@ -1968,6 +2425,8 @@ module dexlyn_clmm::pool {
         amount: u64,
         fix_amount_a: bool
     ): AddLiquidityReceipt acquires Pool {
+        check_position_authority(account, pool_address, position_index);
+
         // 1. Check position and pool
         let pool = borrow_global_mut<Pool>(pool_address);
         assert_status(pool);
@@ -2815,7 +3274,7 @@ module dexlyn_clmm::pool {
                 item.tick_lower,
                 item.tick_upper
             );
-            let receipt = add_liquidity(pool_address, item.liquidity, position_index);
+            let receipt = add_liquidity_v2(owner, pool_address, item.liquidity, position_index);
             assert!(item.amount_a == receipt.amount_a, 0);
             assert!(item.amount_b == receipt.amount_b, 0);
             amount_a = amount_a + receipt.amount_a;
@@ -2899,7 +3358,8 @@ module dexlyn_clmm::pool {
                 item.tick_lower,
                 item.tick_upper
             );
-            let receipt = add_liquidity_fix_asset(
+            let receipt = add_liquidity_fix_asset_v2(
+                owner,
                 pool_address,
                 item.amount_a,
                 true,
@@ -2938,7 +3398,7 @@ module dexlyn_clmm::pool {
             i64::neg_from(50000),
             i64::from(50000)
         );
-        let receipt = add_liquidity(pool_address, liquidity, position_index);
+        let receipt = add_liquidity_v2(owner, pool_address, liquidity, position_index);
         assert!(receipt.amount_a == 15733516889, 0);
         assert!(receipt.amount_b == 46997543902, 0);
         let a_metadata = object::address_to_object<Metadata>(assets.asset_a_addr);
@@ -2999,7 +3459,7 @@ module dexlyn_clmm::pool {
             i64::neg_from(300000),
             i64::from(300000)
         );
-        let receipt = add_liquidity(pool_address, liquidity, position_index);
+        let receipt = add_liquidity_v2(owner, pool_address, liquidity, position_index);
         let a_metadata = object::address_to_object<Metadata>(assets.asset_a_addr);
         let b_metadata = object::address_to_object<Metadata>(assets.asset_b_addr);
         let asset_a = primary_fungible_store::withdraw(clmm, a_metadata, receipt.amount_a);
@@ -3322,5 +3782,568 @@ module dexlyn_clmm::pool {
             20,
             10
         );
+    }
+
+    #[test_only]
+    struct RewarderTestAssets has key, drop {
+        reward_asset_1_addr: address,
+        reward_asset_2_addr: address,
+        reward_asset_3_addr: address,
+    }
+
+    #[test_only]
+    fun setup_rewarder_test_assets(clmm: &signer): RewarderTestAssets {
+        let reward_asset_1 = setup_fungible_assets(clmm, utf8(b"Reward Token 1"), utf8(b"RT1"));
+        let reward_asset_2 = setup_fungible_assets(clmm, utf8(b"Reward Token 2"), utf8(b"RT2"));
+        let reward_asset_3 = setup_fungible_assets(clmm, utf8(b"Reward Token 3"), utf8(b"RT3"));
+
+        RewarderTestAssets {
+            reward_asset_1_addr: reward_asset_1,
+            reward_asset_2_addr: reward_asset_2,
+            reward_asset_3_addr: reward_asset_3,
+        }
+    }
+
+    #[test_only]
+    fun new_pool_for_rewarder_testing(
+        clmm: &signer,
+        tick_spacing: u64,
+        fee_rate: u64,
+        init_sqrt_price: u128,
+    ): (address, RewarderTestAssets, address, address) {
+        let (asset_a_name, asset_b_name) = (utf8(b"Token A"), utf8(b"Token B"));
+        let asset_a = setup_fungible_assets(clmm, asset_a_name, utf8(b"TA"));
+        let asset_b = setup_fungible_assets(clmm, asset_b_name, utf8(b"TB"));
+
+        let (pool_account, pool_cap) = account::create_resource_account(clmm, b"RewarderTestPool");
+        let rewarder_assets = setup_rewarder_test_assets(clmm);
+
+        config::initialize(clmm);
+        config::init_clmm_acl(clmm);
+        fee_tier::initialize(clmm);
+        partner::initialize(clmm);
+        fee_tier::add_fee_tier(clmm, tick_spacing, fee_rate);
+
+        new(
+            &pool_account,
+            tick_spacing,
+            init_sqrt_price,
+            1,
+            string::utf8(b""),
+            pool_cap,
+            asset_a,
+            asset_b
+        );
+
+        (signer::address_of(&pool_account), rewarder_assets, asset_a, asset_b)
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456
+    )]
+    fun test_initialize_multiple_rewarders(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 1, rewarder_assets.reward_asset_2_addr);
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 2, rewarder_assets.reward_asset_3_addr);
+
+        let pool = borrow_global<Pool>(pool_address);
+        assert!(vector::length(&pool.rewarder_infos) == 3, 0);
+
+        let rewarder_0 = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder_0.asset_address == rewarder_assets.reward_asset_1_addr, 0);
+        assert!(rewarder_0.authority == signer::address_of(authority), 0);
+        assert!(rewarder_0.pending_authority == @0x0, 0);
+        assert!(rewarder_0.emissions_per_second == 0, 0);
+        assert!(rewarder_0.growth_global == 0, 0);
+        assert!(rewarder_0.balance == 0, 0);
+
+        let rewarder_1 = vector::borrow(&pool.rewarder_infos, 1);
+        assert!(rewarder_1.asset_address == rewarder_assets.reward_asset_2_addr, 0);
+
+        let rewarder_2 = vector::borrow(&pool.rewarder_infos, 2);
+        assert!(rewarder_2.asset_address == rewarder_assets.reward_asset_3_addr, 0);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456
+    )]
+    fun test_update_emission_success(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, 1000000000);
+
+        let emissions_per_second = 18446744073709551616; // 1 token per second
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.emissions_per_second == emissions_per_second, 0);
+        assert!(rewarder.balance == 1000000000, 1);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456,
+        new_authority = @0x789
+    )]
+    fun test_transfer_rewarder_authority_success(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+        new_authority: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(new_authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+
+        transfer_rewarder_authority(authority, pool_address, 0, signer::address_of(new_authority));
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.authority == signer::address_of(authority), 0);
+        assert!(rewarder.pending_authority == signer::address_of(new_authority), 0);
+
+        accept_rewarder_authority(new_authority, pool_address, 0);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.authority == signer::address_of(new_authority), 0);
+        assert!(rewarder.pending_authority == @0x0, 0);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456,
+        owner = @0x789
+    )]
+    fun test_collect_rewarder_success(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+        owner: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+
+        let position_index = open_position(owner, pool_address, i64::neg_from(60), i64::from(60));
+        let receipt = add_liquidity_v2(owner, pool_address, 1000000000, position_index);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let (amount_a_needed, amount_b_needed) = add_liqudity_pay_amount(&receipt);
+        let asset_a_metadata = object::address_to_object<Metadata>(pool.asset_a_addr);
+        let asset_b_metadata = object::address_to_object<Metadata>(pool.asset_b_addr);
+        let asset_a = primary_fungible_store::withdraw(clmm, asset_a_metadata, amount_a_needed);
+        let asset_b = primary_fungible_store::withdraw(clmm, asset_b_metadata, amount_b_needed);
+        repay_add_liquidity(asset_a, asset_b, receipt);
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, (MONTHS_IN_SECONDS as u64));
+
+        let emissions_per_second = 18446744073709551616;
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+
+        timestamp::fast_forward_seconds(10);
+
+        let reward_asset = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            0,
+            true,
+            rewarder_assets.reward_asset_1_addr
+        );
+        let reward_amount = fungible_asset::amount(&reward_asset);
+        assert!(reward_amount > 0, 0);
+        primary_fungible_store::deposit(signer::address_of(owner), reward_asset);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let position = table::borrow(&pool.positions, position_index);
+        let position_rewarder = vector::borrow(&position.rewarder_infos, 0);
+        assert!(position_rewarder.amount_owed == 0, 0);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456,
+        owner = @0x789
+    )]
+    fun test_rewarder_full_workflow(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+        owner: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        let position_index = open_position(owner, pool_address, i64::neg_from(60), i64::from(60));
+        let receipt = add_liquidity_v2(owner, pool_address, 1000000000, position_index);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+
+        let (amount_a_needed, amount_b_needed) = add_liqudity_pay_amount(&receipt);
+        let pool = borrow_global<Pool>(pool_address);
+        let asset_a_metadata = object::address_to_object<Metadata>(pool.asset_a_addr);
+        let asset_b_metadata = object::address_to_object<Metadata>(pool.asset_b_addr);
+        let asset_a = primary_fungible_store::withdraw(clmm, asset_a_metadata, amount_a_needed);
+        let asset_b = primary_fungible_store::withdraw(clmm, asset_b_metadata, amount_b_needed);
+        repay_add_liquidity(asset_a, asset_b, receipt);
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, 1000000000);
+        let emissions_per_second = 18446744073709551616; // 1 token per second
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+
+        timestamp::fast_forward_seconds(5);
+
+        let reward_asset = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            0,
+            true,
+            rewarder_assets.reward_asset_1_addr
+        );
+        let reward_amount = fungible_asset::amount(&reward_asset);
+        assert!(reward_amount > 0, 0);
+        primary_fungible_store::deposit(signer::address_of(owner), reward_asset);
+
+        let new_authority = @0x888;
+        transfer_rewarder_authority(authority, pool_address, 0, new_authority);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.pending_authority == new_authority, 0);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456,
+        owner = @0x789
+    )]
+    fun test_multiple_rewarders_workflow(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+        owner: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        let position_index = open_position(owner, pool_address, i64::neg_from(60), i64::from(60));
+        let receipt = add_liquidity_v2(owner, pool_address, 1000000000, position_index);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 1, rewarder_assets.reward_asset_2_addr);
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 2, rewarder_assets.reward_asset_3_addr);
+
+        let (amount_a_needed, amount_b_needed) = add_liqudity_pay_amount(&receipt);
+        let pool = borrow_global<Pool>(pool_address);
+        let asset_a_metadata = object::address_to_object<Metadata>(pool.asset_a_addr);
+        let asset_b_metadata = object::address_to_object<Metadata>(pool.asset_b_addr);
+        let asset_a = primary_fungible_store::withdraw(clmm, asset_a_metadata, amount_a_needed);
+        let asset_b = primary_fungible_store::withdraw(clmm, asset_b_metadata, amount_b_needed);
+        repay_add_liquidity(asset_a, asset_b, receipt);
+
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, 1000000000);
+        deposit_reward(clmm, pool_address, 1, rewarder_assets.reward_asset_2_addr, 1000000000);
+        deposit_reward(clmm, pool_address, 2, rewarder_assets.reward_asset_3_addr, 1000000000);
+
+        let emissions_per_second = 18446744073709551616; // 1 token per second
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+        update_emission(authority, pool_address, 1, emissions_per_second, rewarder_assets.reward_asset_2_addr);
+        update_emission(authority, pool_address, 2, emissions_per_second, rewarder_assets.reward_asset_3_addr);
+
+        timestamp::fast_forward_seconds(3);
+
+        let reward_1 = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            0,
+            true,
+            rewarder_assets.reward_asset_1_addr
+        );
+        let reward_2 = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            1,
+            true,
+            rewarder_assets.reward_asset_2_addr
+        );
+        let reward_3 = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            2,
+            true,
+            rewarder_assets.reward_asset_3_addr
+        );
+
+        assert!(fungible_asset::amount(&reward_1) > 0, 0);
+        assert!(fungible_asset::amount(&reward_2) > 0, 0);
+        assert!(fungible_asset::amount(&reward_3) > 0, 0);
+
+        primary_fungible_store::deposit(signer::address_of(owner), reward_1);
+        primary_fungible_store::deposit(signer::address_of(owner), reward_2);
+        primary_fungible_store::deposit(signer::address_of(owner), reward_3);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let position = table::borrow(&pool.positions, position_index);
+        let position_rewarder_0 = vector::borrow(&position.rewarder_infos, 0);
+        let position_rewarder_1 = vector::borrow(&position.rewarder_infos, 1);
+        let position_rewarder_2 = vector::borrow(&position.rewarder_infos, 2);
+        assert!(position_rewarder_0.amount_owed == 0, 0);
+        assert!(position_rewarder_1.amount_owed == 0, 0);
+        assert!(position_rewarder_2.amount_owed == 0, 0);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456
+    )]
+    fun test_distribute_success(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        let position_index = open_position(clmm, pool_address, i64::neg_from(60), i64::from(60));
+        let receipt = add_liquidity_v2(clmm, pool_address, 1000000000, position_index);
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, (MONTHS_IN_SECONDS as u64));
+
+        let (amount_a_needed, amount_b_needed) = add_liqudity_pay_amount(&receipt);
+        let pool = borrow_global<Pool>(pool_address);
+        let asset_a_metadata = object::address_to_object<Metadata>(pool.asset_a_addr);
+        let asset_b_metadata = object::address_to_object<Metadata>(pool.asset_b_addr);
+        let asset_a = primary_fungible_store::withdraw(clmm, asset_a_metadata, amount_a_needed);
+        let asset_b = primary_fungible_store::withdraw(clmm, asset_b_metadata, amount_b_needed);
+        repay_add_liquidity(asset_a, asset_b, receipt);
+
+        let emissions_per_second = 18446744073709551616; // 1 token per second
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.emissions_per_second == emissions_per_second, 0);
+        assert!(rewarder.balance == (MONTHS_IN_SECONDS as u64), 1);
+
+        timestamp::fast_forward_seconds(86499);
+
+        let fa_asset = primary_fungible_store::withdraw(
+            clmm,
+            object::address_to_object<Metadata>(rewarder_assets.reward_asset_1_addr),
+            100
+        );
+        primary_fungible_store::deposit(pool_address, fa_asset);
+
+        let rewarder_asset = collect_rewarder(
+            clmm,
+            pool_address,
+            position_index,
+            0,
+            true,
+            rewarder_assets.reward_asset_1_addr
+        );
+        primary_fungible_store::deposit(signer::address_of(clmm), rewarder_asset);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456,
+        owner = @0x789
+    )]
+    fun test_collect_rewarder_insufficient_balance(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer,
+        owner: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(owner));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, asset_a_addr, asset_b_addr) = new_pool_for_rewarder_testing(
+            clmm,
+            60,
+            2000,
+            18446744073709551616
+        );
+
+        initialize_rewarder(clmm, pool_address, signer::address_of(authority), 0, rewarder_assets.reward_asset_1_addr);
+        let position_index = open_position(owner, pool_address, i64::neg_from(60), i64::from(60));
+        let receipt = add_liquidity_v2(owner, pool_address, 1000000000, position_index);
+
+        let (amount_a_needed, amount_b_needed) = add_liqudity_pay_amount(&receipt);
+        let asset_a_metadata = object::address_to_object<Metadata>(asset_a_addr);
+        let asset_b_metadata = object::address_to_object<Metadata>(asset_b_addr);
+        let asset_a = primary_fungible_store::withdraw(clmm, asset_a_metadata, amount_a_needed);
+        let asset_b = primary_fungible_store::withdraw(clmm, asset_b_metadata, amount_b_needed);
+        repay_add_liquidity(asset_a, asset_b, receipt);
+
+        let small_reward_amount: u64 = (MONTHS_IN_SECONDS as u64);
+        deposit_reward(clmm, pool_address, 0, rewarder_assets.reward_asset_1_addr, small_reward_amount);
+
+        let emissions_per_second = 18446744073709551616;
+        update_emission(authority, pool_address, 0, emissions_per_second, rewarder_assets.reward_asset_1_addr);
+
+        timestamp::fast_forward_seconds(
+            ((2 * MONTHS_IN_SECONDS) as u64)
+        );
+
+        let reward_asset = collect_rewarder(
+            owner,
+            pool_address,
+            position_index,
+            0,
+            true,
+            rewarder_assets.reward_asset_1_addr
+        );
+
+        let collected_amount = fungible_asset::amount(&reward_asset);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        let position = table::borrow(&pool.positions, position_index);
+        let position_rewarder = vector::borrow(&position.rewarder_infos, 0);
+
+        assert!(collected_amount == small_reward_amount, 2);
+        assert!(rewarder.balance == 0, 4);
+        assert!(position_rewarder.amount_owed > 0, 5);
+        assert!(position_rewarder.amount_owed >= (MONTHS_IN_SECONDS as u64) - 1, 6); // rounding variation up to 1
+
+        primary_fungible_store::deposit(signer::address_of(owner), reward_asset);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456
+    )]
+    fun test_update_rewarder_duration_admin_only(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(
+            clmm,
+            pool_address,
+            signer::address_of(authority),
+            0,
+            rewarder_assets.reward_asset_1_addr
+        );
+
+        let one_day_seconds = 24 * 60 * 60;
+        update_rewarder_duration(clmm, pool_address, 0, one_day_seconds);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+
+        assert!(rewarder.duration_seconds == one_day_seconds, 1);
+
+        let one_week_seconds = 7 * 24 * 60 * 60;
+        update_rewarder_duration(clmm, pool_address, 0, one_week_seconds);
+
+        let pool = borrow_global<Pool>(pool_address);
+        let rewarder = vector::borrow(&pool.rewarder_infos, 0);
+        assert!(rewarder.duration_seconds == one_week_seconds, 2);
+    }
+
+    #[test(
+        supra_framework = @0x1,
+        clmm = @dexlyn_clmm,
+        authority = @0x123456
+    )]
+    #[expected_failure(abort_code = config::ENOT_HAS_PRIVILEGE)]
+    fun test_update_rewarder_duration_non_admin_fails(
+        supra_framework: &signer,
+        clmm: &signer,
+        authority: &signer
+    ) acquires Pool {
+        account::create_account_for_test(signer::address_of(clmm));
+        account::create_account_for_test(signer::address_of(authority));
+        account::create_account_for_test(signer::address_of(supra_framework));
+        timestamp::set_time_has_started_for_testing(supra_framework);
+
+        let (pool_address, rewarder_assets, _, _) = new_pool_for_rewarder_testing(clmm, 60, 2000, 18446744073709551616);
+
+        initialize_rewarder(
+            clmm,
+            pool_address,
+            signer::address_of(authority),
+            0,
+            rewarder_assets.reward_asset_1_addr
+        );
+
+        let one_day_seconds = 24 * 60 * 60;
+        update_rewarder_duration(authority, pool_address, 0, one_day_seconds);
     }
 }

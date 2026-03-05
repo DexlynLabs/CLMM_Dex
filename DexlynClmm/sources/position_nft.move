@@ -27,6 +27,9 @@ module dexlyn_clmm::position_nft {
     /// The tick is invalid
     const ENFT_DOES_NOT_EXIST: u64 = 1;
 
+    /// The collection does not exist
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
+
     const KEY_POSITION_INDEX: vector<u8> = b"position_index";
     const KEY_TOKEN_CREATOR: vector<u8> = b"token_creator";
     const KEY_TICK_LOWER: vector<u8> = b"tick_lower";
@@ -166,6 +169,7 @@ module dexlyn_clmm::position_nft {
         let token_name = position_name(pool_index, position_index);
         let token_description = string::utf8(b"Dexlyn CLMM Position NFT");
         let creation_time = timestamp::now_seconds();
+        let creator_addr = signer::address_of(creator);
 
 
         // Create token with Digital Asset Standard
@@ -195,7 +199,7 @@ module dexlyn_clmm::position_nft {
         property_map::add_typed(
             &property_mutator_ref,
             string::utf8(KEY_TOKEN_CREATOR),
-            bcs::to_bytes(creator)
+            bcs::to_bytes(&creator_addr)
         );
         property_map::add_typed(
             &property_mutator_ref,
@@ -243,10 +247,10 @@ module dexlyn_clmm::position_nft {
         object::transfer(creator, token, signer::address_of(receiver));
 
         event::emit(NFTMintEvent {
-            creator: signer::address_of(creator),
+            creator: creator_addr,
             receiver: signer::address_of(receiver),
             token_address: object::object_address(&token),
-            pool_address: signer::address_of(creator),
+            pool_address: creator_addr,
             position_index,
             tick_lower,
             tick_upper,
@@ -463,4 +467,20 @@ module dexlyn_clmm::position_nft {
     }
 
     public fun mutate_collection_uri(_creator: &signer, _collection: String, _uri: String) {}
+
+    public(friend) fun update_uri(
+        collection_addr: address,
+        token_addresses: vector<address>,
+        uri: String
+    ) acquires CollectionController, PositionNFTObjectController
+    {
+        assert!(exists<CollectionController>(collection_addr), ECOLLECTION_DOES_NOT_EXIST);
+        let controller = borrow_global_mut<CollectionController>(collection_addr);
+        collection::set_uri(&controller.mutator_ref, uri);
+
+        vector::for_each(token_addresses, |addr| {
+            let nft_controller = borrow_global_mut<PositionNFTObjectController>(addr);
+            token::set_uri(&nft_controller.mutator_ref, uri);
+        });
+    }
 }

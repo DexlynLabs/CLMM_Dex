@@ -5,7 +5,6 @@ module dexlyn_clmm::clmm_math {
     use integer_mate::i64::{Self, I64};
     use integer_mate::math_u128;
     use integer_mate::math_u256;
-    use integer_mate::u256::U256;
 
     /// token amount exceeded the maximum value
     const ETOKEN_AMOUNT_MAX_EXCEEDED: u64 = 1;
@@ -16,19 +15,34 @@ module dexlyn_clmm::clmm_math {
     /// multiplication overflow
     const EMULTIPLICATION_OVERFLOW: u64 = 3;
 
-    /// division overflow
-    const EINTEGER_DOWNCAST_OVERFLOW: u64 = 4;
-
     /// invalid sqrt price input
-    const EINVALID_SQRT_PRICE_INPUT: u64 = 5;
+    const EINVALID_SQRT_PRICE_INPUT: u64 = 4;
 
     /// invalid fixed token type
-    const EINVALID_FIXED_TOKEN_TYPE: u64 = 6;
+    const EINVALID_FIXED_TOKEN_TYPE: u64 = 5;
 
-    /// deprecated function
-    const EFUN_DEPRECATED: u64 = 7;
+    /// Error when tick range is invalid
+    const EINVALID_TICK_RANGE: u64 = 6;
+
+    /// Error when subtraction operation results in underflow
+    const ESUBTRACTION_UNDERFLOW: u64 = 7;
+
+    /// Error when amount cast to u128 results in overflow
+    const EAMOUNT_CAST_TO_U128_OVERFLOW: u64 = 8;
+
+    /// Error when casting amount to u64 results in overflow
+    const EAMOUNT_CAST_TO_U64_OVERFLOW: u64 = 9;
+
+    /// Error when current sqrt price is less than target sqrt price
+    const ESQRT_PRICE_0_OUT_OF_RANGE: u64 = 10;
+
+    /// Error when current sqrt price is greater than target sqrt price
+    const ESQRT_PRICE_1_OUT_OF_RANGE: u64 = 11;
 
     const FEE_RATE_DENOMINATOR: u64 = 1000000;
+
+    const MAX_U64: u64 = 0xffffffffffffffff;
+    const MAX_U128: u128 = 0xffffffffffffffffffffffffffffffff;
 
     #[view]
     public fun fee_rate_denominator(): u64 {
@@ -42,19 +56,23 @@ module dexlyn_clmm::clmm_math {
         amount_a: u64,
         round_up: bool
     ): u128 {
+        assert!(sqrt_price_0 != sqrt_price_1, EINVALID_SQRT_PRICE_INPUT);
         let sqrt_price_diff = if (sqrt_price_0 > sqrt_price_1) {
             sqrt_price_0 - sqrt_price_1
         } else {
             sqrt_price_1 - sqrt_price_0
         };
-        // let numberator = u256::mul(
-        //     u256::shrw(full_math_u128::full_mul(sqrt_price_0, sqrt_price_1)),
-        //     u256::from((amount_a as u128))
-        // );
-        // let div_res = u256::checked_div_round(numberator, u256::from(sqrt_price_diff), round_up);
-        // u256::as_u128(div_res)
-        let numberator = (full_math_u128::full_mul_v2(sqrt_price_0, sqrt_price_1) >> 64) * (amount_a as u256);
-        let div_res = math_u256::div_round(numberator, (sqrt_price_diff as u256), round_up);
+        assert!(
+            sqrt_price_0 >= tick_math::min_sqrt_price() && sqrt_price_0 <= tick_math::max_sqrt_price(),
+            ESQRT_PRICE_0_OUT_OF_RANGE
+        );
+        assert!(
+            sqrt_price_1 >= tick_math::min_sqrt_price() && sqrt_price_1 <= tick_math::max_sqrt_price(),
+            ESQRT_PRICE_1_OUT_OF_RANGE
+        );
+        let numerator = (full_math_u128::full_mul_v2(sqrt_price_0, sqrt_price_1) >> 64) * (amount_a as u256);
+        let div_res = math_u256::div_round(numerator, (sqrt_price_diff as u256), round_up);
+        assert!(div_res <= (MAX_U128 as u256), EAMOUNT_CAST_TO_U128_OVERFLOW);
         (div_res as u128)
     }
 
@@ -65,22 +83,18 @@ module dexlyn_clmm::clmm_math {
         amount_b: u64,
         round_up: bool
     ): u128 {
+        assert!(sqrt_price_0 != sqrt_price_1, EINVALID_SQRT_PRICE_INPUT);
         let sqrt_price_diff = if (sqrt_price_0 > sqrt_price_1) {
             sqrt_price_0 - sqrt_price_1
         } else {
             sqrt_price_1 - sqrt_price_0
         };
-        // let div_res = u256::checked_div_round(
-        //     u256::shlw(u256::from((amount_b as u128))),
-        //     u256::from(sqrt_price_diff),
-        //     round_up
-        // );
-        // u256::as_u128(div_res)
         let div_res = math_u256::div_round(
             ((amount_b as u256) << 64),
             (sqrt_price_diff as u256),
             round_up
         );
+        assert!(div_res <= (MAX_U128 as u256), EAMOUNT_CAST_TO_U128_OVERFLOW);
         (div_res as u128)
     }
 
@@ -99,21 +113,15 @@ module dexlyn_clmm::clmm_math {
         if (sqrt_price_diff == 0 || liquidity == 0) {
             return 0
         };
-        // let (numberator, overflowing) = u256::checked_shlw(full_math_u128::full_mul(liquidity, sqrt_price_diff));
-        // if (overflowing) {
-        //     abort EMULTIPLICATION_OVERFLOW
-        // };
-        // let denomminator = full_math_u128::full_mul(sqrt_price_0, sqrt_price_1);
-        // let quotient = u256::checked_div_round(numberator, denomminator, round_up);
-        // (u256::as_u64(quotient))
-        let (numberator, overflowing) = math_u256::checked_shlw(
+        let (numerator, overflowing) = math_u256::checked_shlw(
             full_math_u128::full_mul_v2(liquidity, sqrt_price_diff)
         );
         if (overflowing) {
             abort EMULTIPLICATION_OVERFLOW
         };
         let denominator = full_math_u128::full_mul_v2(sqrt_price_0, sqrt_price_1);
-        let quotient = math_u256::div_round(numberator, denominator, round_up);
+        let quotient = math_u256::div_round(numerator, denominator, round_up);
+        assert!(quotient <= (MAX_U64 as u256), EAMOUNT_CAST_TO_U64_OVERFLOW);
         (quotient as u64)
     }
 
@@ -132,19 +140,17 @@ module dexlyn_clmm::clmm_math {
         if (sqrt_price_diff == 0 || liquidity == 0) {
             return 0
         };
-        // let product = full_math_u128::full_mul(liquidity, sqrt_price_diff);
-        // let should_round_up = (round_up) && (u256::get(&product, 0) > 0);
-        // if (should_round_up) {
-        //     return u256::as_u64(u256::shrw(product)) + 1
-        // };
-        // (u256::as_u64(u256::shrw(product)))
-
         let lo64_mask = 0x000000000000000000000000000000000000000000000000ffffffffffffffff;
         let product = full_math_u128::full_mul_v2(liquidity, sqrt_price_diff);
         let should_round_up = (round_up) && ((product & lo64_mask) > 0);
         if (should_round_up) {
+            assert!(
+                ((product >> 64) + 1) <= (MAX_U64 as u256),
+                EAMOUNT_CAST_TO_U64_OVERFLOW,
+            );
             return (((product >> 64) + 1) as u64)
         };
+        assert!((product >> 64) <= (MAX_U64 as u256), EAMOUNT_CAST_TO_U64_OVERFLOW);
         ((product >> 64) as u64)
     }
 
@@ -158,20 +164,8 @@ module dexlyn_clmm::clmm_math {
         if (amount == 0) {
             return sqrt_price
         };
-        // let (numberator, overflowing) = u256::checked_shlw(full_math_u128::full_mul(sqrt_price, liquidity));
-        // if (overflowing) {
-        //     abort EMULTIPLICATION_OVERFLOW
-        // };
-        // let liquidity_shl_64 = u256::shlw(u256::from(liquidity));
-        // let product = full_math_u128::full_mul(sqrt_price, (amount as u128));
-        // let quotient = if (by_amount_input) {
-        //     u256::checked_div_round(numberator, u256::add(liquidity_shl_64, product), true)
-        // } else {
-        //     u256::checked_div_round(numberator, u256::sub(liquidity_shl_64, product), true)
-        // };
-        // let new_sqrt_price = u256::as_u128(quotient);
 
-        let (numberator, overflowing) = math_u256::checked_shlw(
+        let (numerator, overflowing) = math_u256::checked_shlw(
             full_math_u128::full_mul_v2(sqrt_price, liquidity)
         );
         if (overflowing) {
@@ -181,14 +175,17 @@ module dexlyn_clmm::clmm_math {
         let liquidity_shl_64 = (liquidity as u256) << 64;
         let product = full_math_u128::full_mul_v2(sqrt_price, (amount as u128));
         let new_sqrt_price = if (by_amount_input) {
-            (math_u256::div_round(numberator, (liquidity_shl_64 + product), true) as u128)
+            (math_u256::div_round(numerator, (liquidity_shl_64 + product), true) as u128)
         } else {
-            (math_u256::div_round(numberator, (liquidity_shl_64 - product), true) as u128)
+            if (liquidity_shl_64 <= product) {
+                abort ESUBTRACTION_UNDERFLOW
+            };
+            (math_u256::div_round(numerator, (liquidity_shl_64 - product), true) as u128)
         };
 
-        if (new_sqrt_price > tick_math::max_sqrt_price()) {
+        if (new_sqrt_price >= tick_math::max_sqrt_price()) {
             abort ETOKEN_AMOUNT_MAX_EXCEEDED
-        } else if (new_sqrt_price < tick_math::min_sqrt_price()) {
+        } else if (new_sqrt_price <= tick_math::min_sqrt_price()) {
             abort ETOKEN_AMOUNT_MIN_SUBCEEDED
         };
 
@@ -206,6 +203,9 @@ module dexlyn_clmm::clmm_math {
         let new_sqrt_price = if (by_amount_input) {
             sqrt_price + delta_sqrt_price
         } else {
+            if (sqrt_price < delta_sqrt_price) {
+                abort ESUBTRACTION_UNDERFLOW
+            };
             sqrt_price - delta_sqrt_price
         };
 
@@ -246,17 +246,8 @@ module dexlyn_clmm::clmm_math {
         }
     }
 
-    public fun get_delta_up_from_input(
-        _current_sqrt_price: u128,
-        _target_sqrt_price: u128,
-        _liquidity: u128,
-        _a_to_b: bool,
-    ): U256 {
-        abort EFUN_DEPRECATED
-    }
-
     #[view]
-    public fun get_delta_up_from_input_v2(
+    public fun get_delta_up_from_input(
         current_sqrt_price: u128,
         target_sqrt_price: u128,
         liquidity: u128,
@@ -271,29 +262,15 @@ module dexlyn_clmm::clmm_math {
             return 0
         };
         if (a_to_b) {
-            // let (numberator, overflowing) = u256::checked_shlw(full_math_u128::full_mul(liquidity, sqrt_price_diff));
-            // if (overflowing) {
-            //     abort EMULTIPLICATION_OVERFLOW
-            // };
-            // let denomminator = full_math_u128::full_mul(current_sqrt_price, target_sqrt_price);
-            // u256::checked_div_round(numberator, denomminator, true)
-
-            let (numberator, overflowing) = math_u256::checked_shlw(
+            let (numerator, overflowing) = math_u256::checked_shlw(
                 full_math_u128::full_mul_v2(liquidity, sqrt_price_diff)
             );
             if (overflowing) {
                 abort EMULTIPLICATION_OVERFLOW
             };
             let denominator = full_math_u128::full_mul_v2(current_sqrt_price, target_sqrt_price);
-            math_u256::div_round(numberator, denominator, true)
+            math_u256::div_round(numerator, denominator, true)
         } else {
-            // let product = full_math_u128::full_mul(liquidity, sqrt_price_diff);
-            // let should_round_up = u256::get(&product, 0) > 0;
-            // if (should_round_up) {
-            //     return u256::add(u256::shrw(product), u256::from(1))
-            // };
-            // u256::shrw(product)
-
             let product = full_math_u128::full_mul_v2(liquidity, sqrt_price_diff);
             let lo64_mask = 0x000000000000000000000000000000000000000000000000ffffffffffffffff;
             let should_round_up = (product & lo64_mask) > 0;
@@ -304,17 +281,8 @@ module dexlyn_clmm::clmm_math {
         }
     }
 
-    public fun get_delta_down_from_output(
-        _current_sqrt_price: u128,
-        _target_sqrt_price: u128,
-        _liquidity: u128,
-        _a_to_b: bool,
-    ): U256 {
-        abort EFUN_DEPRECATED
-    }
-
     #[view]
-    public fun get_delta_down_from_output_v2(
+    public fun get_delta_down_from_output(
         current_sqrt_price: u128,
         target_sqrt_price: u128,
         liquidity: u128,
@@ -329,26 +297,17 @@ module dexlyn_clmm::clmm_math {
             return 0
         };
         if (a_to_b) {
-            // let product = full_math_u128::full_mul(liquidity, sqrt_price_diff);
-            // u256::shrw(product)
             let product = full_math_u128::full_mul_v2(liquidity, sqrt_price_diff);
             product >> 64
         } else {
-            // let (numberator, overflowing) = u256::checked_shlw(full_math_u128::full_mul(liquidity, sqrt_price_diff));
-            // if (overflowing) {
-            //     abort EMULTIPLICATION_OVERFLOW
-            // };
-            // let denomminator = full_math_u128::full_mul(current_sqrt_price, target_sqrt_price);
-            // u256::checked_div_round(numberator, denomminator, false)
-
-            let (numberator, overflowing) = math_u256::checked_shlw(
+            let (numerator, overflowing) = math_u256::checked_shlw(
                 full_math_u128::full_mul_v2(liquidity, sqrt_price_diff)
             );
             if (overflowing) {
                 abort EMULTIPLICATION_OVERFLOW
             };
             let denominator = full_math_u128::full_mul_v2(current_sqrt_price, target_sqrt_price);
-            math_u256::div_round(numberator, denominator, false)
+            math_u256::div_round(numerator, denominator, false)
         }
     }
 
@@ -366,7 +325,7 @@ module dexlyn_clmm::clmm_math {
         let amount_in: u64 = 0;
         let amount_out: u64 = 0;
         let fee_amount: u64 = 0;
-        if (liquidity == 0) {
+        if (liquidity == 0 || current_sqrt_price == target_sqrt_price) {
             return (
                 amount_in,
                 amount_out,
@@ -375,18 +334,15 @@ module dexlyn_clmm::clmm_math {
             )
         };
         if (a2b) {
-            assert!(current_sqrt_price >= target_sqrt_price, EINVALID_SQRT_PRICE_INPUT)
+            assert!(current_sqrt_price > target_sqrt_price, EINVALID_SQRT_PRICE_INPUT)
         } else {
             assert!(current_sqrt_price < target_sqrt_price, EINVALID_SQRT_PRICE_INPUT)
         };
-        //let a_to_b = current_sqrt_price >= target_sqrt_price;
-
         if (by_amount_in) {
             let amount_remain =
                 full_math_u64::mul_div_floor(amount, (FEE_RATE_DENOMINATOR - fee_rate), FEE_RATE_DENOMINATOR);
             let max_amount_in =
-                get_delta_up_from_input_v2(current_sqrt_price, target_sqrt_price, liquidity, a2b);
-            // if (u256::gt(max_amount_in, u256::from((amount_remain as u128)))) {
+                get_delta_up_from_input(current_sqrt_price, target_sqrt_price, liquidity, a2b);
             if (max_amount_in > (amount_remain as u256)) {
                 amount_in = amount_remain;
                 fee_amount = amount - amount_remain;
@@ -397,34 +353,43 @@ module dexlyn_clmm::clmm_math {
                     a2b
                 );
             } else {
-                // it will never overflow here, because max_amount_in < amount_remain and amount_remain's type is u64
-                // amount_in = u256::as_u64(max_amount_in);
+                // it will never overflow here, because max_amount_in < amount_remain and amount_remain's type is u64;
                 amount_in = (max_amount_in as u64);
                 fee_amount =
                     full_math_u64::mul_div_ceil(amount_in, fee_rate, (FEE_RATE_DENOMINATOR - fee_rate));
                 next_sqrt_price = target_sqrt_price;
             };
-            // amount_out = u256::as_u64(get_delta_down_from_output(current_sqrt_price, next_sqrt_price, liquidity, a2b));
-            amount_out = (get_delta_down_from_output_v2(current_sqrt_price, next_sqrt_price, liquidity, a2b) as u64);
+            let amount_out_ = get_delta_down_from_output(
+                current_sqrt_price,
+                next_sqrt_price,
+                liquidity,
+                a2b
+            );
+            assert!(amount_out_ <= (MAX_U64 as u256), EAMOUNT_CAST_TO_U64_OVERFLOW);
+            amount_out = (amount_out_ as u64);
         } else {
-            let max_amount_out = get_delta_down_from_output_v2(
+            let max_amount_out = get_delta_down_from_output(
                 current_sqrt_price,
                 target_sqrt_price,
                 liquidity,
                 a2b
             );
-            // if ( u256::gt(max_amount_out, u256::from((amount as u128)))) {
             if (max_amount_out > (amount as u256)) {
                 amount_out = amount;
                 next_sqrt_price =
                     get_next_sqrt_price_from_output(current_sqrt_price, liquidity, amount, a2b);
             } else {
-                // amount_out = u256::as_u64(max_amount_out);
                 amount_out = (max_amount_out as u64);
                 next_sqrt_price = target_sqrt_price;
             };
-            // amount_in = u256::as_u64(get_delta_up_from_input(current_sqrt_price, next_sqrt_price, liquidity, a2b));
-            amount_in = (get_delta_up_from_input_v2(current_sqrt_price, next_sqrt_price, liquidity, a2b) as u64);
+            let amount_in_ = get_delta_up_from_input(
+                current_sqrt_price,
+                next_sqrt_price,
+                liquidity,
+                a2b
+            );
+            assert!(amount_in_ <= (MAX_U64 as u256), EAMOUNT_CAST_TO_U64_OVERFLOW);
+            amount_in = (amount_in_ as u64);
             fee_amount = full_math_u64::mul_div_ceil(amount_in, fee_rate, (FEE_RATE_DENOMINATOR - fee_rate));
         };
 
@@ -455,6 +420,7 @@ module dexlyn_clmm::clmm_math {
         if (liquidity == 0) {
             return (0, 0)
         };
+        assert!(i64::lt(tick_lower, tick_upper), EINVALID_TICK_RANGE);
         let lower_price = tick_math::get_sqrt_price_at_tick(tick_lower);
         let upper_price = tick_math::get_sqrt_price_at_tick(tick_upper);
         // Only asset a
@@ -484,29 +450,27 @@ module dexlyn_clmm::clmm_math {
         let upper_price = tick_math::get_sqrt_price_at_tick(upper_index);
         let amount_a: u64 = 0;
         let amount_b: u64 = 0;
-        let _liquidity: u128 = 0;
+        let liquidity: u128 = 0;
         if (is_fixed_a) {
             amount_a = amount;
-            if (i64::lt(current_tick_index, lower_index)) {
-                _liquidity = get_liquidity_from_a(lower_price, upper_price, amount, false);
-            }else if (i64::lt(current_tick_index, upper_index)) {
-                _liquidity = get_liquidity_from_a(current_sqrt_price, upper_price, amount, false);
-                amount_b = get_delta_b(current_sqrt_price, lower_price, _liquidity, true);
-            }else {
-                abort EINVALID_FIXED_TOKEN_TYPE
+            assert!(current_sqrt_price < upper_price, EINVALID_FIXED_TOKEN_TYPE);
+            if (i64::lte(current_tick_index, lower_index)) {
+                liquidity = get_liquidity_from_a(lower_price, upper_price, amount, false);
+            } else {
+                liquidity = get_liquidity_from_a(current_sqrt_price, upper_price, amount, false);
+                amount_b = get_delta_b(current_sqrt_price, lower_price, liquidity, true);
             };
         }else {
             amount_b = amount;
+            assert!(current_sqrt_price > lower_price, EINVALID_FIXED_TOKEN_TYPE);
             if (i64::gte(current_tick_index, upper_index)) {
-                _liquidity = get_liquidity_from_b(lower_price, upper_price, amount, false);
-            }else if (i64::gte(current_tick_index, lower_index)) {
-                _liquidity = get_liquidity_from_b(lower_price, current_sqrt_price, amount, false);
-                amount_a = get_delta_a(current_sqrt_price, upper_price, _liquidity, true);
-            }else {
-                abort EINVALID_FIXED_TOKEN_TYPE
-            }
+                liquidity = get_liquidity_from_b(lower_price, upper_price, amount, false);
+            } else {
+                liquidity = get_liquidity_from_b(lower_price, current_sqrt_price, amount, false);
+                amount_a = get_delta_a(current_sqrt_price, upper_price, liquidity, true);
+            };
         };
-        (_liquidity, amount_a, amount_b)
+        (liquidity, amount_a, amount_b)
     }
 
     #[test]
@@ -660,6 +624,68 @@ module dexlyn_clmm::clmm_math {
         assert!(amount_out == 19979, 0);
         assert!(next_sqrt_price == 18446744159522998190, 0);
         assert!(fee_amount == 20, 0);
+    }
+
+    #[test]
+    fun test_compute_swap_step_equal_prices() {
+        // current_sqrt_price == target_sqrt_price with by_amount_in = true
+        let (current_sqrt_price, target_sqrt_price, liquidity, amount, fee_rate) = (
+            1u128 << 64,
+            1u128 << 64,
+            1000u128 << 32,
+            20000,
+            1000u64,
+        );
+        let (amount_in, amount_out, next_sqrt_price, fee_amount) = compute_swap_step(
+            current_sqrt_price,
+            target_sqrt_price,
+            liquidity,
+            amount,
+            fee_rate,
+            true,
+            true
+        );
+        assert!(amount_in == 0, 1);
+        assert!(amount_out == 0, 2);
+        assert!(next_sqrt_price == target_sqrt_price, 3);
+        assert!(fee_amount == 0, 4);
+
+        // current_sqrt_price == target_sqrt_price with by_amount_in = false
+        let (amount_in, amount_out, next_sqrt_price, fee_amount) = compute_swap_step(
+            current_sqrt_price,
+            target_sqrt_price,
+            liquidity,
+            amount,
+            fee_rate,
+            false,
+            false
+        );
+        assert!(amount_in == 0, 5);
+        assert!(amount_out == 0, 6);
+        assert!(next_sqrt_price == target_sqrt_price, 7);
+        assert!(fee_amount == 0, 8);
+
+        // current_sqrt_price == target_sqrt_price with zero liquidity
+        let (current_sqrt_price, target_sqrt_price, liquidity, amount, fee_rate) = (
+            1u128 << 64,
+            1u128 << 64,
+            0u128, // Zero liquidity
+            20000,
+            1000u64,
+        );
+        let (amount_in, amount_out, next_sqrt_price, fee_amount) = compute_swap_step(
+            current_sqrt_price,
+            target_sqrt_price,
+            liquidity,
+            amount,
+            fee_rate,
+            true,
+            true
+        );
+        assert!(amount_in == 0, 9);
+        assert!(amount_out == 0, 10);
+        assert!(next_sqrt_price == target_sqrt_price, 11);
+        assert!(fee_amount == 0, 12);
     }
 }
 

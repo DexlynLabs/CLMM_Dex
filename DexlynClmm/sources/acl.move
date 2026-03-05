@@ -46,7 +46,7 @@ module dexlyn_clmm::acl {
         assert!(role < 128, error::invalid_argument(EROLE_NUMBER_TOO_LARGE));
         if (table::contains(&acl.permissions, member)) {
             let perms = table::borrow_mut(&mut acl.permissions, member);
-            *perms = *perms - (1 << role);
+            *perms = *perms & (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF - (1 << role));
         }
     }
 
@@ -76,6 +76,34 @@ module dexlyn_clmm::acl {
         };
 
         // can't drop so must store
+        move_to(&dummy, TestACL { acl });
+    }
+
+    #[test(dummy = @0x1234)]
+    fun test_remove_roles(dummy: signer) {
+        let acl = new();
+
+        add_role(&mut acl, @0x1234, 1);
+        add_role(&mut acl, @0x1234, 127);
+        assert!(has_role(&acl, @0x1234, 1), 1);
+        assert!(has_role(&acl, @0x1234, 127), 2);
+
+        remove_role(&mut acl, @0x1234, 0);
+        assert!(has_role(&acl, @0x1234, 127), 3);
+        assert!(!has_role(&acl, @0x1234, 0), 4);
+
+        add_role(&mut acl, @0x1234, 50);
+        assert!(has_role(&acl, @0x1234, 50), 5);
+
+        remove_role(&mut acl, @0x1234, 1);
+        assert!(has_role(&acl, @0x1234, 50), 6);
+        assert!(has_role(&acl, @0x1234, 127), 7);
+        assert!(!has_role(&acl, @0x1234, 1), 8);
+
+        remove_role(&mut acl, @0x1234, 50);
+        assert!(!has_role(&acl, @0x1234, 50), 9);
+        assert!(has_role(&acl, @0x1234, 127), 10);
+
         move_to(&dummy, TestACL { acl });
     }
 }

@@ -5,9 +5,11 @@
 
 module dexlyn_clmm::fee_tier {
     use aptos_std::simple_map::{Self, SimpleMap};
+
     use supra_framework::event;
-    use dexlyn_clmm::config;
     use supra_framework::timestamp;
+
+    use dexlyn_clmm::config;
 
     /// Max swap fee rate(100000 = 200000/1000000 = 20%)
     const MAX_FEE_RATE: u64 = 200000;
@@ -19,11 +21,8 @@ module dexlyn_clmm::fee_tier {
     /// The fee tier not found
     const EFEE_TIER_NOT_FOUND: u64 = 2;
 
-    /// The fee tier already initialized
-    const EFEETIER_ALREADY_INITIALIZED: u64 = 3;
-
     /// The fee rate is invalid
-    const EINVALID_FEE_RATE: u64 = 4;
+    const EINVALID_FEE_RATE: u64 = 3;
 
     /// The clmmpools fee tier data
     struct FeeTier has store, copy, drop {

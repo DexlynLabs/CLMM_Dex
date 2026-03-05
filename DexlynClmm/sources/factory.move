@@ -21,7 +21,7 @@ module dexlyn_clmm::factory {
     /// Consts
     const POOL_OWNER_SEED: vector<u8> = b"DexlynPoolOwner";
     const COLLECTION_DESCRIPTION: vector<u8> = b"Dexlyn Liquidity Position";
-    const POOL_DEFAULT_URI: vector<u8> = b"";
+    const POOL_DEFAULT_URI: vector<u8> = b"https://qa-cdn.dexlyn.com/clmm/clmm.json";
 
     /// Errors
     /// The pool is already initialized
